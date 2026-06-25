@@ -7,13 +7,51 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
+  <!-- Login overlay (shown until authenticated) -->
+  <div id="loginOverlay" class="login-overlay">
+    <form id="loginForm" class="login-card">
+      <div class="brand login-brand"><span class="brand-mark">⛨</span> Ranbval Resume Shortlister</div>
+      <p class="muted">Sign in to continue.</p>
+      <label>Username</label>
+      <input id="loginName" type="text" autocomplete="username" autofocus />
+      <label>Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password" />
+      <div id="loginError" class="login-error hidden"></div>
+      <button id="loginBtn" class="btn btn-primary" type="submit" style="width:100%;margin-top:14px;">Sign in</button>
+    </form>
+  </div>
+
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">⛨</span>
       <span>Ranbval <strong>Resume Shortlister</strong></span>
     </div>
-    <div class="topbar-hint">Strict AI screening · no fluff</div>
+    <div class="topbar-right">
+      <button id="usersBtn" class="btn btn-ghost hidden">Users</button>
+      <span id="whoami" class="topbar-hint"></span>
+      <button id="logoutBtn" class="btn btn-ghost hidden">Logout</button>
+    </div>
   </header>
+
+  <!-- Admin Users modal -->
+  <div id="usersModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Users</h2>
+        <button id="closeUsers" class="btn btn-ghost">✕</button>
+      </div>
+      <div class="add-user-row">
+        <input id="newUserName" type="text" placeholder="username" />
+        <input id="newUserPass" type="text" placeholder="password" />
+        <select id="newUserRole">
+          <option value="user">user</option>
+          <option value="admin">admin</option>
+        </select>
+        <button id="addUserBtn" class="btn btn-primary">Add</button>
+      </div>
+      <div id="usersList" class="users-list"></div>
+    </div>
+  </div>
 
   <main class="layout">
     <!-- LEFT: jobs -->

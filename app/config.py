@@ -29,6 +29,12 @@ class Settings:
     shortlist_threshold: int = int(os.environ.get("SHORTLIST_THRESHOLD", "75"))
     supabase_url: str = os.environ.get("SUPABASE_URL", "").strip()
     supabase_key: str = os.environ.get("SUPABASE_KEY", "").strip()
+    # Secret used to sign login tokens. Defaults to a value derived from the
+    # Supabase key so it's stable across restarts without extra config.
+    auth_secret: str = (
+        os.environ.get("AUTH_SECRET", "").strip()
+        or (os.environ.get("SUPABASE_KEY", "").strip() or "ranbval-resume-secret")
+    )
 
 
 @lru_cache(maxsize=1)

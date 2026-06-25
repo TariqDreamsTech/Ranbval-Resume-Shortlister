@@ -1,13 +1,16 @@
 """Resume upload + scoring + candidate listing — backed by Supabase."""
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.database import CANDIDATES_TABLE, JOBS_TABLE, get_client
+from app.deps import require_user
 from app.schemas import CandidateOut
 from app.services.extract import extract_text
 from app.services.scoring import score_resume
 
-router = APIRouter(prefix="/api/jobs/{job_id}", tags=["resumes"])
+router = APIRouter(
+    prefix="/api/jobs/{job_id}", tags=["resumes"], dependencies=[Depends(require_user)]
+)
 
 _MAX_BYTES = 10 * 1024 * 1024  # 10 MB per resume
 

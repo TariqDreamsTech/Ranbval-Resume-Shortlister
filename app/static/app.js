@@ -4,9 +4,33 @@ const $ = (id) => document.getElementById(id);
 let activeJobId = null;
 let threshold = 75;
 
+// ── Auth state (token kept in localStorage) ──
+const auth = {
+  get token() { return localStorage.getItem('rs_token') || ''; },
+  get role() { return localStorage.getItem('rs_role') || ''; },
+  get name() { return localStorage.getItem('rs_name') || ''; },
+  set(token, name, role) {
+    localStorage.setItem('rs_token', token);
+    localStorage.setItem('rs_name', name);
+    localStorage.setItem('rs_role', role);
+  },
+  clear() {
+    localStorage.removeItem('rs_token');
+    localStorage.removeItem('rs_name');
+    localStorage.removeItem('rs_role');
+  },
+};
+
 // ── API helpers ──
 async function api(path, opts = {}) {
-  const res = await fetch(`/api${path}`, opts);
+  const headers = { ...(opts.headers || {}) };
+  if (auth.token) headers['Authorization'] = `Bearer ${auth.token}`;
+  const res = await fetch(`/api${path}`, { ...opts, headers });
+  if (res.status === 401) {
+    auth.clear();
+    showLogin('Session expired — please sign in again.');
+    throw new Error('Not authenticated');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
   return data;
@@ -214,7 +238,142 @@ $('fileInput').onchange = (e) => {
   e.target.value = '';
 };
 
-(async function init() {
+// ── Auth UI ──
+function showLogin(msg) {
+  $('loginOverlay').style.display = 'flex';
+  $('usersBtn').classList.add('hidden');
+  $('logoutBtn').classList.add('hidden');
+  $('whoami').textContent = '';
+  const err = $('loginError');
+  if (msg) { err.textContent = msg; err.classList.remove('hidden'); }
+  else { err.classList.add('hidden'); }
+  setTimeout(() => $('loginName').focus(), 50);
+}
+
+function hideLogin() {
+  $('loginOverlay').style.display = 'none';
+  $('logoutBtn').classList.remove('hidden');
+  $('whoami').textContent = `${auth.name} · ${auth.role}`;
+  if (auth.role === 'admin') $('usersBtn').classList.remove('hidden');
+  else $('usersBtn').classList.add('hidden');
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  const name = $('loginName').value.trim();
+  const password = $('loginPass').value;
+  const btn = $('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'Login failed');
+    auth.set(data.token, data.name, data.role);
+    $('loginPass').value = '';
+    hideLogin();
+    await startApp();
+  } catch (err) {
+    showLogin(err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+}
+
+function logout() {
+  auth.clear();
+  activeJobId = null;
+  $('jobView').classList.add('hidden');
+  $('jobForm').classList.add('hidden');
+  $('emptyState').classList.remove('hidden');
+  showLogin();
+}
+
+// ── Admin: Users management ──
+async function openUsers() {
+  $('usersModal').classList.remove('hidden');
+  await loadUsers();
+}
+
+async function loadUsers() {
+  const users = await api('/admin/users');
+  const list = $('usersList');
+  list.innerHTML = '';
+  users.forEach((u) => {
+    const row = document.createElement('div');
+    row.className = 'user-row';
+    row.innerHTML = `
+      <input class="u-name" value="${escapeAttr(u.name)}" />
+      <input class="u-pass" value="${escapeAttr(u.password)}" />
+      <select class="u-role">
+        <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+      </select>
+      <button class="btn btn-ghost u-save">Save</button>
+      <button class="link-danger u-del">Delete</button>`;
+    row.querySelector('.u-save').onclick = async () => {
+      try {
+        await api(`/admin/users/${u.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: row.querySelector('.u-name').value.trim(),
+            password: row.querySelector('.u-pass').value,
+            role: row.querySelector('.u-role').value,
+          }),
+        });
+        await loadUsers();
+      } catch (e) { alert(e.message); }
+    };
+    row.querySelector('.u-del').onclick = async () => {
+      if (!confirm(`Delete user "${u.name}"?`)) return;
+      try { await api(`/admin/users/${u.id}`, { method: 'DELETE' }); await loadUsers(); }
+      catch (e) { alert(e.message); }
+    };
+    list.appendChild(row);
+  });
+}
+
+async function addUser() {
+  const name = $('newUserName').value.trim();
+  const password = $('newUserPass').value;
+  const role = $('newUserRole').value;
+  if (!name || !password) { alert('Enter a username and password.'); return; }
+  try {
+    await api('/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, password, role }),
+    });
+    $('newUserName').value = ''; $('newUserPass').value = '';
+    await loadUsers();
+  } catch (e) { alert(e.message); }
+}
+
+function escapeAttr(s) { return String(s ?? '').replace(/"/g, '&quot;'); }
+
+// auth wiring
+$('loginForm').onsubmit = doLogin;
+$('logoutBtn').onclick = logout;
+$('usersBtn').onclick = openUsers;
+$('closeUsers').onclick = () => $('usersModal').classList.add('hidden');
+$('addUserBtn').onclick = addUser;
+
+// ── Boot ──
+async function startApp() {
   await loadHealth();
   await loadJobs();
+}
+
+(async function init() {
+  if (auth.token) {
+    hideLogin();
+    try { await startApp(); }
+    catch { /* 401 handler already showed login */ }
+  } else {
+    showLogin();
+  }
 })();

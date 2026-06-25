@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.routers import jobs, pages, resumes
+from app.routers import auth, jobs, pages, resumes, users
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -19,6 +19,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(pages.router)
+    app.include_router(auth.router)
+    app.include_router(users.router)
     app.include_router(jobs.router)
     app.include_router(resumes.router)
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")

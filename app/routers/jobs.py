@@ -1,11 +1,12 @@
 """Job (Job Description) endpoints — backed by Supabase."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import CANDIDATES_TABLE, JOBS_TABLE, get_client
+from app.deps import require_user
 from app.schemas import JobCreate, JobOut
 
-router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_user)])
 
 
 @router.post("", response_model=JobOut)

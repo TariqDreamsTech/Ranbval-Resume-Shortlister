@@ -3,6 +3,37 @@
 from pydantic import BaseModel, Field
 
 
+class LoginIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class LoginOut(BaseModel):
+    token: str
+    name: str
+    role: str
+
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    password: str
+    role: str
+    created_at: str
+
+
+class UserCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)
+    role: str = Field(default="user")
+
+
+class UserUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=80)
+    password: str | None = Field(default=None, max_length=200)
+    role: str | None = None
+
+
 class JobCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     description: str = Field(min_length=20)
