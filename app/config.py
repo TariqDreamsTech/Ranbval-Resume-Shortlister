@@ -27,6 +27,12 @@ class Settings:
     openai_api_key: str = os.environ.get("OPENAI_API_KEY", "").strip()
     openai_model: str = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
     shortlist_threshold: int = int(os.environ.get("SHORTLIST_THRESHOLD", "75"))
+    # How many queued resumes one /process call claims, and how many OpenAI
+    # calls run concurrently within it. Keep BATCH small enough that a single
+    # call finishes inside the serverless timeout (Vercel Hobby = 10s).
+    process_batch: int = int(os.environ.get("PROCESS_BATCH", "6"))
+    process_concurrency: int = int(os.environ.get("PROCESS_CONCURRENCY", "3"))
+    openai_max_retries: int = int(os.environ.get("OPENAI_MAX_RETRIES", "4"))
     supabase_url: str = os.environ.get("SUPABASE_URL", "").strip()
     supabase_key: str = os.environ.get("SUPABASE_KEY", "").strip()
     # Secret used to sign login tokens. Defaults to a value derived from the

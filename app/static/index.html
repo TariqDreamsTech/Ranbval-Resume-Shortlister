@@ -27,11 +27,28 @@
       <span>Ranbval <strong>Resume Shortlister</strong></span>
     </div>
     <div class="topbar-right">
+      <button id="dashBtn" class="btn btn-ghost hidden">Dashboard</button>
       <button id="usersBtn" class="btn btn-ghost hidden">Users</button>
       <span id="whoami" class="topbar-hint"></span>
       <button id="logoutBtn" class="btn btn-ghost hidden">Logout</button>
     </div>
   </header>
+
+  <!-- Admin Dashboard modal -->
+  <div id="dashModal" class="modal-backdrop hidden">
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2>Admin Dashboard</h2>
+        <div style="display:flex;gap:8px;">
+          <button id="dashRefresh" class="btn btn-ghost">Refresh</button>
+          <button id="closeDash" class="btn btn-ghost">✕</button>
+        </div>
+      </div>
+      <div id="dashStats" class="dash-stats"></div>
+      <h3 class="dash-subhead">Per-job breakdown</h3>
+      <div id="dashJobs" class="dash-jobs"></div>
+    </div>
+  </div>
 
   <!-- Admin Users modal -->
   <div id="usersModal" class="modal-backdrop hidden">
@@ -99,13 +116,20 @@
         <div class="card upload-card">
           <div class="upload-row">
             <div>
-              <h3>Upload a resume</h3>
-              <p class="muted">PDF, DOCX, or TXT — one at a time. We score it instantly.</p>
+              <h3>Upload resumes</h3>
+              <p class="muted">PDF, DOCX, or TXT — drop in hundreds at once. They queue and score in the background.</p>
             </div>
-            <label class="btn btn-primary file-btn">
-              <input id="fileInput" type="file" accept=".pdf,.docx,.txt" hidden />
-              Choose &amp; score
-            </label>
+            <div class="upload-actions">
+              <button id="resumeBtn" class="btn btn-ghost hidden">▶ Score pending</button>
+              <label class="btn btn-primary file-btn">
+                <input id="fileInput" type="file" accept=".pdf,.docx,.txt" multiple hidden />
+                Choose resumes
+              </label>
+            </div>
+          </div>
+          <div id="batchProgress" class="batch-progress hidden">
+            <div class="bp-bar"><div id="bpFill" class="bp-fill"></div></div>
+            <div id="bpText" class="bp-text muted"></div>
           </div>
           <div id="uploadStatus" class="upload-status hidden"></div>
         </div>

@@ -1,11 +1,14 @@
-"""Strict resume screening via OpenAI.
+"""Strict resume screening via OpenAI — async, concurrency-safe, with retries.
 
-Returns a structured verdict for a single resume against a job description.
 The screener is deliberately harsh: it defaults to REJECT unless the candidate
-clearly satisfies the role's hard requirements.
+clearly satisfies the role's hard requirements. Scoring runs asynchronously so a
+single /process call can score several resumes concurrently, with exponential
+backoff on rate limits / transient errors.
 """
 
+import asyncio
 import json
+import random
 from typing import Any
 
 from fastapi import HTTPException
@@ -25,8 +28,7 @@ Screening rules (follow strictly):
 3. Be strict about RELEVANCE. A strong resume for a DIFFERENT role is still a
    REJECT. A junior applying to a senior role (or vice versa) is a poor match.
 4. Penalize heavily: missing must-have skills, insufficient years, career gaps
-   with no explanation, job-hopping, irrelevant industry, or a resume that is
-   mostly generic filler.
+   with no explanation, job-hopping, irrelevant industry, or generic filler.
 5. Never inflate scores to be "nice". Most real applicant pools are mostly weak —
    your score distribution should reflect that.
 
@@ -55,25 +57,21 @@ Return STRICT JSON only, matching this shape:
 }"""
 
 
-def _client():
+def async_client():
     settings = get_settings()
     if not settings.openai_api_key:
         raise HTTPException(
             status_code=503,
-            detail="OPENAI_API_KEY is not set. Add it to your .env file.",
+            detail="OPENAI_API_KEY is not set. Add it to your environment.",
         )
-    from openai import OpenAI
+    from openai import AsyncOpenAI
 
-    return OpenAI(api_key=settings.openai_api_key)
+    # Per-call timeout keeps a stuck request from eating the whole batch budget.
+    return AsyncOpenAI(api_key=settings.openai_api_key, timeout=40.0, max_retries=0)
 
 
-def score_resume(
-    *, job_title: str, job_description: str, resume_text: str
-) -> dict[str, Any]:
-    settings = get_settings()
-    threshold = settings.shortlist_threshold
-
-    user_prompt = (
+def _user_prompt(job_title: str, job_description: str, resume_text: str, threshold: int) -> str:
+    return (
         f"JOB TITLE:\n{job_title}\n\n"
         f"JOB DESCRIPTION:\n{job_description}\n\n"
         f"SHORTLIST THRESHOLD (score must be >= this to shortlist): {threshold}\n\n"
@@ -81,34 +79,54 @@ def score_resume(
         "Screen this resume against the job. Be strict. Return the JSON only."
     )
 
-    try:
-        resp = _client().chat.completions.create(
-            model=settings.openai_model,
-            temperature=0,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-    except HTTPException:
-        raise
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"OpenAI error: {e}") from e
 
-    raw = (resp.choices[0].message.content or "").strip()
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=502, detail="Model returned invalid JSON."
-        ) from None
+async def score_one_async(
+    client, *, job_title: str, job_description: str, resume_text: str
+) -> dict[str, Any]:
+    """Score a single resume. Retries on rate-limit / transient errors."""
+    settings = get_settings()
+    threshold = settings.shortlist_threshold
 
-    return _normalize(data, threshold)
+    # Import lazily so the module loads even if openai isn't installed yet.
+    from openai import APIConnectionError, APITimeoutError, RateLimitError
+
+    last_err: Exception | None = None
+    for attempt in range(settings.openai_max_retries + 1):
+        try:
+            resp = await client.chat.completions.create(
+                model=settings.openai_model,
+                temperature=0,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": _user_prompt(
+                            job_title, job_description, resume_text, threshold
+                        ),
+                    },
+                ],
+            )
+            raw = (resp.choices[0].message.content or "").strip()
+            return _normalize(json.loads(raw), threshold)
+        except (RateLimitError, APITimeoutError, APIConnectionError) as e:
+            last_err = e
+            if attempt >= settings.openai_max_retries:
+                break
+            # exponential backoff with jitter: 1, 2, 4, 8s (+ up to 1s jitter)
+            await asyncio.sleep(2 ** attempt + random.random())
+        except json.JSONDecodeError as e:
+            last_err = e
+            break
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            break
+
+    raise RuntimeError(f"scoring failed: {last_err}")
 
 
 def _normalize(data: dict[str, Any], threshold: int) -> dict[str, Any]:
-    """Coerce model output into a safe, consistent shape + enforce threshold."""
+    """Coerce model output into a safe, consistent shape + enforce strictness."""
     try:
         score = int(round(float(data.get("overall_score", 0))))
     except (TypeError, ValueError):
@@ -120,18 +138,10 @@ def _normalize(data: dict[str, Any], threshold: int) -> dict[str, Any]:
         verdict = "reject"
 
     missing = _as_str_list(data.get("missing_requirements"))
-
-    # Enforce strictness server-side: recommended only if score clears the
-    # threshold AND the model didn't flag a missing hard requirement.
     recommended = score >= threshold and verdict == "shortlist"
-    if recommended and missing:
-        # A real missing must-have downgrades to "maybe" — never auto-shortlist.
-        critical = any(
-            _looks_critical(m) for m in missing
-        )
-        if critical:
-            recommended = False
-            verdict = "maybe"
+    if recommended and any(_looks_critical(m) for m in missing):
+        recommended = False
+        verdict = "maybe"
 
     years = data.get("years_experience")
     try:

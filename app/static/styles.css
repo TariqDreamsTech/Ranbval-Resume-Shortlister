@@ -192,6 +192,26 @@ input:-webkit-autofill:focus {
 /* Upload */
 .upload-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .upload-row h3 { margin: 0 0 4px; font-size: 0.98rem; }
+.upload-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Batch progress bar */
+.batch-progress { margin-top: 14px; }
+.bp-bar {
+  height: 8px; border-radius: 6px; overflow: hidden;
+  background: rgba(255,255,255,.07); border: 1px solid var(--border);
+}
+.bp-fill {
+  height: 100%; width: 2%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 6px; transition: width .3s ease;
+}
+.bp-text { margin-top: 7px; font-size: 0.78rem; }
+
+/* Pending / error candidate cards */
+.cand-pending { opacity: 0.85; }
+.cand-pending .cand-top { cursor: default; }
+.cand-error .cand-top { cursor: default; }
+.cand-error { border-color: rgba(248,113,113,.35); }
 .upload-status {
   margin-top: 14px; padding: 10px 14px; border-radius: 10px;
   font-size: 0.84rem;
@@ -301,6 +321,47 @@ input:-webkit-autofill:focus {
 
 @media (max-width: 620px) {
   .add-user-row, .user-row { grid-template-columns: 1fr 1fr; }
+}
+
+/* Dashboard */
+.modal-wide { width: 820px; }
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.dstat {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.dstat-num { font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+.dstat-label { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
+.dash-subhead { font-size: 0.92rem; margin: 6px 0 12px; }
+.dash-jobs { display: flex; flex-direction: column; gap: 4px; }
+.djob-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.2fr 1.1fr 0.8fr;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+}
+.djob-row:not(.djob-head):hover { background: rgba(255,255,255,.03); }
+.djob-head { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); border-radius: 0; }
+.djob-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.djob-cell { color: var(--muted); }
+.djob-rate { text-align: right; font-weight: 700; color: var(--text); }
+
+@media (max-width: 720px) {
+  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+  .djob-row { grid-template-columns: 1.6fr 1fr 1fr; }
+  .djob-row .djob-cell:nth-child(4), .djob-row .djob-rate { display: none; }
 }
 
 @media (max-width: 760px) {

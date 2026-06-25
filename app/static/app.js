@@ -126,6 +126,7 @@ async function openJob(jobId) {
   resetFilters();
   await loadCandidates();
   await loadJobs();
+  await refreshPendingButton();
 }
 
 function resetFilters() {
@@ -212,6 +213,41 @@ function scoreColor(score) {
 }
 
 function renderCandidate(c) {
+  // Not-yet-scored states get a compact card.
+  if (c.status === 'queued' || c.status === 'processing') {
+    const el = document.createElement('div');
+    el.className = 'cand cand-pending';
+    const label = c.status === 'processing' ? 'Scoring…' : 'Queued';
+    el.innerHTML = `
+      <div class="cand-top">
+        <div class="score-badge" style="background:rgba(255,255,255,.05);color:var(--muted);">⏳</div>
+        <div class="cand-main">
+          <div class="cand-name">${escapeHtml(c.filename)}</div>
+          <div class="cand-file">${label}</div>
+        </div>
+        <span class="verdict v-maybe">${label}</span>
+      </div>`;
+    return el;
+  }
+  if (c.status === 'error') {
+    const el = document.createElement('div');
+    el.className = 'cand cand-error';
+    el.innerHTML = `
+      <div class="cand-top">
+        <div class="score-badge" style="background:rgba(248,113,113,.14);color:var(--red);">⚠</div>
+        <div class="cand-main">
+          <div class="cand-name">${escapeHtml(c.filename)}</div>
+          <div class="cand-file">Scoring failed: ${escapeHtml(c.error || 'unknown error')}</div>
+        </div>
+        <button class="btn btn-ghost" data-retry="${c.id}">Retry</button>
+      </div>`;
+    el.querySelector('[data-retry]').onclick = async () => {
+      await api(`/jobs/${activeJobId}/candidates/${c.id}/retry`, { method: 'POST' });
+      await runProcessing();
+    };
+    return el;
+  }
+
   const el = document.createElement('div');
   el.className = 'cand' + (c.recommended ? ' rec' : '');
 
@@ -261,24 +297,110 @@ function renderCandidate(c) {
   return el;
 }
 
-// ── Upload ──
-async function uploadResume(file) {
-  const status = $('uploadStatus');
-  status.className = 'upload-status loading';
-  status.classList.remove('hidden');
-  status.textContent = `Screening "${file.name}" against the JD…`;
+// ── Upload + scoring at scale ──
+const UPLOAD_CONCURRENCY = 4;     // parallel upload requests from this browser
+let busy = false;
 
-  const form = new FormData();
-  form.append('file', file);
-  try {
-    await api(`/jobs/${activeJobId}/resumes`, { method: 'POST', body: form });
-    status.classList.add('hidden');
-    await loadCandidates();
-    await loadJobs();
-  } catch (e) {
-    status.className = 'upload-status error';
-    status.textContent = e.message;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function showProgress(text, pct) {
+  $('batchProgress').classList.remove('hidden');
+  $('bpFill').style.width = `${Math.max(2, Math.min(100, pct))}%`;
+  $('bpText').textContent = text;
+}
+function hideProgressSoon() {
+  setTimeout(() => $('batchProgress').classList.add('hidden'), 1500);
+}
+
+async function handleFiles(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length || busy || !activeJobId) return;
+  busy = true;
+  $('uploadStatus').classList.add('hidden');
+
+  // ── Phase 1: upload (enqueue) with a small concurrency pool ──
+  const total = files.length;
+  let uploaded = 0, uploadFailed = 0, idx = 0;
+  showProgress(`Uploading 0 / ${total}…`, 0);
+
+  async function uploadWorker() {
+    while (idx < files.length) {
+      const file = files[idx++];
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        await api(`/jobs/${activeJobId}/resumes`, { method: 'POST', body: form });
+      } catch { uploadFailed++; }
+      uploaded++;
+      showProgress(`Uploading ${uploaded} / ${total}…`, Math.round((uploaded / total) * 100));
+    }
   }
+  await Promise.all(
+    Array.from({ length: Math.min(UPLOAD_CONCURRENCY, files.length) }, uploadWorker)
+  );
+  await loadCandidates();
+
+  // ── Phase 2: drain the scoring queue ──
+  await runProcessing();
+
+  if (uploadFailed) {
+    const s = $('uploadStatus');
+    s.className = 'upload-status error';
+    s.classList.remove('hidden');
+    s.textContent = `${uploadFailed} file(s) couldn't be read (scanned/empty?) and were skipped.`;
+  }
+  busy = false;
+}
+
+// Repeatedly claim+score batches until this job's queue is empty.
+async function runProcessing() {
+  let stuck = 0;
+  for (;;) {
+    let res;
+    try {
+      res = await api(`/jobs/${activeJobId}/process`, { method: 'POST' });
+    } catch (e) {
+      showProgress(`Paused: ${e.message}`, 100);
+      break;
+    }
+    const st = await api(`/jobs/${activeJobId}/queue-status`);
+    const finished = st.done + st.error;
+    const pct = st.total ? Math.round((finished / st.total) * 100) : 100;
+    showProgress(
+      `Scored ${finished} / ${st.total}${st.error ? ` · ${st.error} failed` : ''}` +
+        (st.queued + st.processing ? '…' : ' ✓'),
+      pct
+    );
+    await loadCandidates();
+
+    if (st.queued === 0) break; // others may still finish their own claimed rows
+    if (res.processed === 0 && res.failed === 0) {
+      // nothing claimable right now (another worker holds them) — wait & retry
+      if (++stuck >= 5) break;
+      await sleep(1500);
+    } else {
+      stuck = 0;
+    }
+  }
+  hideProgressSoon();
+  await loadCandidates();
+  await loadJobs();
+  await refreshPendingButton();
+}
+
+async function refreshPendingButton() {
+  if (!activeJobId) return;
+  try {
+    const st = await api(`/jobs/${activeJobId}/queue-status`);
+    const pending = st.queued + st.processing;
+    const btn = $('resumeBtn');
+    if (pending > 0 && !busy) {
+      btn.textContent = `▶ Score ${pending} pending`;
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  } catch { /* ignore */ }
 }
 
 // ── Utils ──
@@ -311,10 +433,10 @@ $('toggleJD').onclick = () => {
   $('toggleJD').textContent = box.classList.contains('hidden') ? 'View JD' : 'Hide JD';
 };
 $('fileInput').onchange = (e) => {
-  const file = e.target.files[0];
-  if (file) uploadResume(file);
+  if (e.target.files.length) handleFiles(e.target.files);
   e.target.value = '';
 };
+$('resumeBtn').onclick = () => { if (!busy) runProcessing(); };
 
 // Job search (sidebar)
 $('jobSearch').oninput = renderJobs;
@@ -330,6 +452,7 @@ $('clearFilters').onclick = () => { resetFilters(); renderCandidates(); };
 function showLogin(msg) {
   $('loginOverlay').style.display = 'flex';
   $('usersBtn').classList.add('hidden');
+  $('dashBtn').classList.add('hidden');
   $('logoutBtn').classList.add('hidden');
   $('whoami').textContent = '';
   const err = $('loginError');
@@ -342,8 +465,9 @@ function hideLogin() {
   $('loginOverlay').style.display = 'none';
   $('logoutBtn').classList.remove('hidden');
   $('whoami').textContent = `${auth.name} · ${auth.role}`;
-  if (auth.role === 'admin') $('usersBtn').classList.remove('hidden');
-  else $('usersBtn').classList.add('hidden');
+  const isAdmin = auth.role === 'admin';
+  $('usersBtn').classList.toggle('hidden', !isAdmin);
+  $('dashBtn').classList.toggle('hidden', !isAdmin);
 }
 
 async function doLogin(e) {
@@ -443,12 +567,61 @@ async function addUser() {
 
 function escapeAttr(s) { return String(s ?? '').replace(/"/g, '&quot;'); }
 
+// ── Admin: Dashboard ──
+async function openDashboard() {
+  $('dashModal').classList.remove('hidden');
+  await loadDashboard();
+}
+
+async function loadDashboard() {
+  $('dashStats').innerHTML = '<p class="muted">Loading…</p>';
+  $('dashJobs').innerHTML = '';
+  let d;
+  try { d = await api('/admin/dashboard'); }
+  catch (e) { $('dashStats').innerHTML = `<p class="login-error">${escapeHtml(e.message)}</p>`; return; }
+
+  const card = (value, label, color) =>
+    `<div class="dstat"><div class="dstat-num" style="color:${color}">${value.toLocaleString()}</div>
+     <div class="dstat-label">${label}</div></div>`;
+
+  $('dashStats').innerHTML =
+    card(d.total_users, 'Users', 'var(--accent-2)') +
+    card(d.total_jobs, 'Jobs', '#60a5fa') +
+    card(d.total_candidates, 'Resumes', '#e7e9ee') +
+    card(d.shortlisted, '★ Shortlisted', 'var(--green)') +
+    card(d.maybe, 'Maybe', 'var(--amber)') +
+    card(d.rejected, 'Rejected', 'var(--red)') +
+    card(d.pending, 'Pending', 'var(--accent)') +
+    card(d.errors, 'Errors', 'var(--red)');
+
+  if (!d.jobs.length) { $('dashJobs').innerHTML = '<p class="muted">No jobs yet.</p>'; return; }
+  const rows = d.jobs.map((j) => {
+    const rate = j.total ? Math.round((j.shortlisted / j.total) * 100) : 0;
+    return `<div class="djob-row">
+      <span class="djob-title">${escapeHtml(j.title)}</span>
+      <span class="djob-cell">${j.total} resumes</span>
+      <span class="djob-cell" style="color:var(--green)">${j.shortlisted} shortlisted</span>
+      <span class="djob-cell">${j.pending ? `⏳ ${j.pending} pending` : '✓ done'}</span>
+      <span class="djob-cell djob-rate">${rate}%</span>
+    </div>`;
+  }).join('');
+  $('dashJobs').innerHTML =
+    `<div class="djob-row djob-head">
+       <span>Job</span><span class="djob-cell">Total</span>
+       <span class="djob-cell">Shortlisted</span><span class="djob-cell">Status</span>
+       <span class="djob-cell djob-rate">Pass rate</span>
+     </div>` + rows;
+}
+
 // auth wiring
 $('loginForm').onsubmit = doLogin;
 $('logoutBtn').onclick = logout;
 $('usersBtn').onclick = openUsers;
 $('closeUsers').onclick = () => $('usersModal').classList.add('hidden');
 $('addUserBtn').onclick = addUser;
+$('dashBtn').onclick = openDashboard;
+$('closeDash').onclick = () => $('dashModal').classList.add('hidden');
+$('dashRefresh').onclick = loadDashboard;
 
 // ── Boot ──
 async function startApp() {
