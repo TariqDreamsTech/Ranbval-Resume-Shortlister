@@ -187,7 +187,7 @@ function filteredCandidates() {
   if (sort === 'newest') list.sort((a, b) => ts(b) - ts(a));
   else if (sort === 'oldest') list.sort((a, b) => ts(a) - ts(b));
   else if (sort === 'score_asc') list.sort((a, b) => a.score - b.score);
-  else list.sort((a, b) => (b.recommended - a.recommended) || (b.score - a.score)); // best
+  else list.sort((a, b) => (b.score - a.score) || (b.recommended - a.recommended)); // best = highest score first
 
   return list;
 }
@@ -219,7 +219,7 @@ function renderTop5() {
   const done = allCandidates.filter((c) => c.status === 'done');
   const top = done
     .slice()
-    .sort((a, b) => (b.recommended - a.recommended) || (b.score - a.score))
+    .sort((a, b) => (b.score - a.score) || (b.recommended - a.recommended))
     .slice(0, 5);
   if (top.length === 0) {
     box.innerHTML = '<p class="muted" style="font-size:0.8rem;">No scored candidates yet.</p>';
@@ -462,6 +462,16 @@ let busy = false;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Throttled live refresh of the candidate list (so new CVs appear as they arrive).
+let _liveTimer = null;
+function liveRefresh() {
+  if (_liveTimer) return;
+  _liveTimer = setTimeout(() => {
+    _liveTimer = null;
+    loadCandidates().catch(() => {});
+  }, 500);
+}
+
 function showProgress(text, pct) {
   $('batchProgress').classList.remove('hidden');
   $('bpFill').style.width = `${Math.max(2, Math.min(100, pct))}%`;
@@ -492,6 +502,7 @@ async function handleFiles(fileList) {
       } catch { uploadFailed++; }
       uploaded++;
       showProgress(`Uploading ${uploaded} / ${total}…`, Math.round((uploaded / total) * 100));
+      liveRefresh();  // show each CV in the list as soon as it's queued
     }
   }
   await Promise.all(
