@@ -66,6 +66,9 @@ class CandidateOut(BaseModel):
     job_id: int
     filename: str
     candidate_name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    links: list[str] = []
     score: int
     verdict: str
     recommended: bool

@@ -398,6 +398,25 @@ function renderCandidate(c) {
   const skills = (c.key_skills || []).map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join('');
   const years = c.years_experience != null ? `${c.years_experience} yrs exp` : 'exp N/A';
 
+  // contact line (email · phone) + link chips
+  const cParts = [];
+  if (c.email) cParts.push(`<a href="mailto:${escapeAttr(c.email)}" class="c-link" onclick="event.stopPropagation()">${escapeHtml(c.email)}</a>`);
+  if (c.phone) cParts.push(`<span>${escapeHtml(c.phone)}</span>`);
+  const contactLine = cParts.length ? `<div class="cand-contact">${cParts.join(' · ')}</div>` : '';
+  const linkLabel = (u) => {
+    const s = u.toLowerCase();
+    if (s.includes('linkedin')) return 'LinkedIn';
+    if (s.includes('github')) return 'GitHub';
+    if (s.includes('gitlab')) return 'GitLab';
+    if (s.includes('behance')) return 'Behance';
+    if (s.includes('dribbble')) return 'Dribbble';
+    if (s.includes('medium')) return 'Medium';
+    return 'Link';
+  };
+  const linkChips = (c.links || []).map((u) =>
+    `<a class="chip link-chip" href="${escapeAttr(u.startsWith('http') ? u : 'https://' + u)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${linkLabel(u)}</a>`
+  ).join('');
+
   const measureLabels = {
     skills_match: 'Skills', experience_match: 'Experience', education_match: 'Education',
     seniority_fit: 'Seniority', domain_relevance: 'Domain', responsibility_match: 'Responsibilities',
@@ -421,6 +440,7 @@ function renderCandidate(c) {
       <div class="cand-main">
         <div class="cand-name">${escapeHtml(c.candidate_name || 'Unknown candidate')}</div>
         <div class="cand-file">${escapeHtml(c.filename)} · ${years}</div>
+        ${contactLine}
         <div class="cand-summary">${escapeHtml(c.summary || '')}</div>
       </div>
       <span class="verdict v-${c.verdict}">${c.recommended ? '★ ' : ''}${c.verdict}</span>
@@ -440,6 +460,7 @@ function renderCandidate(c) {
       </div>
       ${flags ? `<div class="detail-block" style="margin-top:14px;"><h4>⚠ Red flags</h4><ul>${flags}</ul></div>` : ''}
       ${skills ? `<div class="detail-block" style="margin-top:14px;"><h4>Key skills</h4><div class="chips">${skills}</div></div>` : ''}
+      ${linkChips ? `<div class="detail-block" style="margin-top:14px;"><h4>Links</h4><div class="chips">${linkChips}</div></div>` : ''}
       <div class="cand-actions">
         <button class="link-danger" data-del="${c.id}">Delete</button>
       </div>

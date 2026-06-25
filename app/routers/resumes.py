@@ -23,7 +23,7 @@ from app.schemas import (
     QueueStatusOut,
 )
 from app.services import interview
-from app.services.extract import extract_text
+from app.services.extract import extract_contact, extract_text
 from app.services.scoring import async_client, score_one_async
 
 router = APIRouter(
@@ -255,21 +255,26 @@ def _enqueue_one(client, job_id: int, filename: str, raw: bytes) -> dict:
     if len(raw) > _MAX_BYTES:
         raise HTTPException(status_code=413, detail="File too large (max 10 MB).")
     resume_text = extract_text(filename, raw)  # cheap CPU work, raises on bad files
-    res = (
-        client.table(CANDIDATES_TABLE)
-        .insert(
-            {
-                "job_id": job_id,
-                "filename": filename,
-                "status": "queued",
-                "verdict": "pending",
-                "score": 0,
-                "recommended": False,
-                "resume_text": resume_text,
-            }
-        )
-        .execute()
-    )
+    contact = extract_contact(resume_text)  # email / phone / links
+    row = {
+        "job_id": job_id,
+        "filename": filename,
+        "status": "queued",
+        "verdict": "pending",
+        "score": 0,
+        "recommended": False,
+        "resume_text": resume_text,
+        "email": contact["email"],
+        "phone": contact["phone"],
+        "links": contact["links"],
+    }
+    try:
+        res = client.table(CANDIDATES_TABLE).insert(row).execute()
+    except Exception:
+        # contact columns not migrated yet — fall back to the core columns.
+        res = client.table(CANDIDATES_TABLE).insert(
+            {k: v for k, v in row.items() if k not in ("email", "phone", "links")}
+        ).execute()
     if not res.data:
         raise HTTPException(status_code=502, detail="Failed to enqueue resume")
     return res.data[0]
@@ -303,6 +308,9 @@ def _to_candidate_out(row: dict) -> CandidateOut:
         job_id=row["job_id"],
         filename=row["filename"],
         candidate_name=row.get("candidate_name"),
+        email=row.get("email"),
+        phone=row.get("phone"),
+        links=row.get("links") or [],
         score=row.get("score", 0) or 0,
         verdict=row.get("verdict", "pending"),
         recommended=bool(row.get("recommended")),

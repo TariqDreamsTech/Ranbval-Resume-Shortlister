@@ -330,7 +330,12 @@ input:-webkit-autofill:focus {
 .cand-main { flex: 1; min-width: 0; }
 .cand-name { font-weight: 700; font-size: 0.95rem; }
 .cand-file { color: var(--muted); font-size: 0.74rem; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cand-contact { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+.cand-contact .c-link { color: var(--accent-2); text-decoration: none; }
+.cand-contact .c-link:hover { text-decoration: underline; }
 .cand-summary { font-size: 0.82rem; color: #c2c6d2; margin-top: 6px; line-height: 1.5; }
+.link-chip { color: var(--accent-2); text-decoration: none; border-color: rgba(124,111,245,.3); }
+.link-chip:hover { background: rgba(124,111,245,.12); }
 .verdict {
   font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
   letter-spacing: 0.04em; padding: 3px 9px; border-radius: 20px; flex-shrink: 0;
