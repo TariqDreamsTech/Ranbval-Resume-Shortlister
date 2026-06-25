@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ranbval Resume Shortlister</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">⛨</span>
+      <span>Ranbval <strong>Resume Shortlister</strong></span>
+    </div>
+    <div class="topbar-hint">Strict AI screening · no fluff</div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: jobs -->
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h2>Jobs</h2>
+        <button id="newJobBtn" class="btn btn-ghost">+ New</button>
+      </div>
+      <div id="jobList" class="job-list"></div>
+    </aside>
+
+    <!-- RIGHT: workspace -->
+    <section class="workspace">
+      <!-- New job form -->
+      <div id="jobForm" class="card hidden">
+        <h2>Create a job</h2>
+        <label>Job title</label>
+        <input id="jobTitle" type="text" placeholder="e.g. Senior Backend Engineer (Python)" />
+        <label>Job description (paste the full JD — the stricter the better)</label>
+        <textarea id="jobDesc" rows="12" placeholder="Responsibilities, must-have skills, minimum years, required tech, qualifications…"></textarea>
+        <div class="row-end">
+          <button id="cancelJobBtn" class="btn btn-ghost">Cancel</button>
+          <button id="saveJobBtn" class="btn btn-primary">Create job</button>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="emptyState" class="empty">
+        <div class="empty-icon">📄</div>
+        <p>Select a job on the left, or create one to start screening resumes.</p>
+      </div>
+
+      <!-- Active job -->
+      <div id="jobView" class="hidden">
+        <div class="card job-header">
+          <div>
+            <h2 id="jvTitle"></h2>
+            <p id="jvMeta" class="muted"></p>
+          </div>
+          <button id="toggleJD" class="btn btn-ghost">View JD</button>
+        </div>
+        <pre id="jvDesc" class="jd-box hidden"></pre>
+
+        <div class="card upload-card">
+          <div class="upload-row">
+            <div>
+              <h3>Upload a resume</h3>
+              <p class="muted">PDF, DOCX, or TXT — one at a time. We score it instantly.</p>
+            </div>
+            <label class="btn btn-primary file-btn">
+              <input id="fileInput" type="file" accept=".pdf,.docx,.txt" hidden />
+              Choose &amp; score
+            </label>
+          </div>
+          <div id="uploadStatus" class="upload-status hidden"></div>
+        </div>
+
+        <div class="results-head">
+          <h3>Candidates <span id="candCount" class="pill">0</span></h3>
+          <span class="muted" id="threshNote"></span>
+        </div>
+        <div id="candidateList" class="candidate-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
