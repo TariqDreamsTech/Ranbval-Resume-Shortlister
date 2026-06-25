@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import CANDIDATES_TABLE, JOBS_TABLE, get_client
-from app.deps import require_user
+from app.deps import require_recruiter
 from app.schemas import JobCreate, JobOut
 
-router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_user)])
+router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_recruiter)])
 
 
 @router.post("", response_model=JobOut)

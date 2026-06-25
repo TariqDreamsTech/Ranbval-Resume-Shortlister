@@ -21,8 +21,9 @@ _TOKEN_TTL = 7 * 24 * 3600  # 7 days
 
 # Self-seeded if missing (so it works even before the SQL seed is run).
 _SEED_USERS = [
-    {"name": "ahsan", "password": "ranbval", "role": "admin"},
-    {"name": "sabeen", "password": "ranbval", "role": "user"},
+    {"name": "ahsan", "password": "ranbval", "role": "admin", "account_type": "recruiter"},
+    {"name": "sabeen", "password": "ranbval", "role": "user", "account_type": "recruiter"},
+    {"name": "student", "password": "ranbval", "role": "user", "account_type": "student"},
 ]
 
 
@@ -41,8 +42,13 @@ def _sign(payload_b64: str) -> str:
     return _b64(sig)
 
 
-def create_token(name: str, role: str) -> str:
-    payload = {"name": name, "role": role, "exp": int(time.time()) + _TOKEN_TTL}
+def create_token(name: str, role: str, account_type: str = "recruiter") -> str:
+    payload = {
+        "name": name,
+        "role": role,
+        "account_type": account_type,
+        "exp": int(time.time()) + _TOKEN_TTL,
+    }
     payload_b64 = _b64(json.dumps(payload, separators=(",", ":")).encode())
     return f"{payload_b64}.{_sign(payload_b64)}"
 
@@ -65,7 +71,7 @@ def decode_token(token: str) -> dict:
 
 # ── seeding + lookup ──
 def ensure_seed() -> None:
-    """Insert the default admin/user accounts if they don't exist yet."""
+    """Insert the default accounts if they don't exist yet."""
     client = get_client()
     for u in _SEED_USERS:
         existing = (
@@ -76,11 +82,21 @@ def ensure_seed() -> None:
             .execute()
         )
         if not existing.data:
-            client.table(_USERS_TABLE).insert(u).execute()
+            try:
+                client.table(_USERS_TABLE).insert(u).execute()
+            except Exception:
+                # account_type column may not exist yet — fall back without it.
+                client.table(_USERS_TABLE).insert(
+                    {k: v for k, v in u.items() if k != "account_type"}
+                ).execute()
 
 
-def authenticate(name: str, password: str) -> dict:
-    """Validate credentials; return the user row. Seeds defaults on first call."""
+def authenticate(name: str, password: str, account_type: str) -> dict:
+    """Validate credentials AND that the account matches the requested type.
+
+    Seeds defaults on first call. A recruiter account cannot sign in on the
+    student tab and vice-versa.
+    """
     ensure_seed()
     client = get_client()
     res = (
@@ -92,4 +108,13 @@ def authenticate(name: str, password: str) -> dict:
     )
     if not res.data or res.data[0]["password"] != password:
         raise HTTPException(status_code=401, detail="Invalid username or password")
-    return res.data[0]
+
+    row = res.data[0]
+    actual = (row.get("account_type") or "recruiter").strip().lower()
+    if actual != account_type:
+        nice = actual.capitalize()
+        raise HTTPException(
+            status_code=403,
+            detail=f"This is a {actual} account — use the {nice} login tab.",
+        )
+    return row

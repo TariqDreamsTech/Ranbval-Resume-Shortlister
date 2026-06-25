@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/admin/users", tags=["users"])
 
 _TABLE = "resume_users"
 _ROLES = {"admin", "user"}
+_TYPES = {"recruiter", "student"}
 
 
 @router.get("", response_model=list[UserOut])
@@ -23,12 +24,20 @@ def list_users(_admin: dict = Depends(require_admin)) -> list[UserOut]:
 @router.post("", response_model=UserOut)
 def create_user(body: UserCreate, _admin: dict = Depends(require_admin)) -> UserOut:
     role = body.role if body.role in _ROLES else "user"
+    acct = body.account_type if body.account_type in _TYPES else "recruiter"
     client = get_client()
     if client.table(_TABLE).select("id").eq("name", body.name.strip()).limit(1).execute().data:
         raise HTTPException(status_code=409, detail="A user with that name already exists")
     res = (
         client.table(_TABLE)
-        .insert({"name": body.name.strip(), "password": body.password, "role": role})
+        .insert(
+            {
+                "name": body.name.strip(),
+                "password": body.password,
+                "role": role,
+                "account_type": acct,
+            }
+        )
         .execute()
     )
     if not res.data:
@@ -47,6 +56,8 @@ def update_user(
         patch["password"] = body.password
     if body.role is not None and body.role in _ROLES:
         patch["role"] = body.role
+    if body.account_type is not None and body.account_type in _TYPES:
+        patch["account_type"] = body.account_type
     if not patch:
         raise HTTPException(status_code=400, detail="Nothing to update")
 
@@ -78,5 +89,6 @@ def _to_user_out(row: dict) -> UserOut:
         name=row["name"],
         password=row.get("password", ""),
         role=row.get("role", "user"),
+        account_type=row.get("account_type", "recruiter"),
         created_at=str(row.get("created_at", "")),
     )

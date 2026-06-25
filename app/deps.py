@@ -20,3 +20,17 @@ def require_admin(authorization: str = Header(default="")) -> dict:
     if payload.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return payload
+
+
+def require_recruiter(authorization: str = Header(default="")) -> dict:
+    payload = require_user(authorization)
+    if (payload.get("account_type") or "recruiter") != "recruiter":
+        raise HTTPException(status_code=403, detail="Recruiter account required")
+    return payload
+
+
+def require_student(authorization: str = Header(default="")) -> dict:
+    payload = require_user(authorization)
+    if payload.get("account_type") != "student":
+        raise HTTPException(status_code=403, detail="Student account required")
+    return payload

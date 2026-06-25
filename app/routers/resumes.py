@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.config import get_settings
 from app.database import CANDIDATES_TABLE, JOBS_TABLE, get_client
-from app.deps import require_user
+from app.deps import require_recruiter
 from app.schemas import (
     BatchUploadOut,
     CandidateOut,
@@ -25,7 +25,7 @@ from app.services.extract import extract_text
 from app.services.scoring import async_client, score_one_async
 
 router = APIRouter(
-    prefix="/api/jobs/{job_id}", tags=["resumes"], dependencies=[Depends(require_user)]
+    prefix="/api/jobs/{job_id}", tags=["resumes"], dependencies=[Depends(require_recruiter)]
 )
 
 _MAX_BYTES = 10 * 1024 * 1024  # 10 MB per resume

@@ -6,12 +6,14 @@ from pydantic import BaseModel, Field
 class LoginIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=1, max_length=200)
+    account_type: str = Field(default="recruiter")
 
 
 class LoginOut(BaseModel):
     token: str
     name: str
     role: str
+    account_type: str
 
 
 class UserOut(BaseModel):
@@ -19,6 +21,7 @@ class UserOut(BaseModel):
     name: str
     password: str
     role: str
+    account_type: str = "recruiter"
     created_at: str
 
 
@@ -26,12 +29,14 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=1, max_length=200)
     role: str = Field(default="user")
+    account_type: str = Field(default="recruiter")
 
 
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=80)
     password: str | None = Field(default=None, max_length=200)
     role: str | None = None
+    account_type: str | None = None
 
 
 class JobCreate(BaseModel):
@@ -84,6 +89,65 @@ class QueueStatusOut(BaseModel):
     done: int
     error: int
     total: int
+
+
+# ── Student coach ──
+class StudentCvOut(BaseModel):
+    filename: str
+    cv_text: str
+
+
+class AnalyzeIn(BaseModel):
+    jd: str = Field(min_length=20)
+    cv_text: str = Field(min_length=20)
+
+
+class AnalyzeOut(BaseModel):
+    match_score: int
+    verdict: str          # strong | needs_work | weak
+    summary: str
+    strengths: list[str] = []
+    gaps: list[str] = []
+    missing_keywords: list[str] = []
+    suggestions: list[str] = []
+    clarifying_questions: list[str] = []
+
+
+class QAItem(BaseModel):
+    question: str
+    answer: str = ""
+
+
+class TailorIn(BaseModel):
+    jd: str = Field(min_length=20)
+    cv_text: str = Field(min_length=20)
+    answers: list[QAItem] = []
+
+
+class TailorOut(BaseModel):
+    resume_markdown: str
+    change_notes: list[str] = []
+
+
+class PrepIn(BaseModel):
+    jd: str = Field(min_length=20)
+    cv_text: str = Field(default="", max_length=30000)
+
+
+class ConceptItem(BaseModel):
+    topic: str
+    why: str = ""
+
+
+class QuestionItem(BaseModel):
+    question: str
+    answer_hint: str = ""
+
+
+class PrepOut(BaseModel):
+    key_concepts: list[ConceptItem] = []
+    questions: list[QuestionItem] = []
+    project_tips: list[str] = []
 
 
 class JobStat(BaseModel):

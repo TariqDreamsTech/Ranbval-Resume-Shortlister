@@ -9,15 +9,18 @@ const auth = {
   get token() { return localStorage.getItem('rs_token') || ''; },
   get role() { return localStorage.getItem('rs_role') || ''; },
   get name() { return localStorage.getItem('rs_name') || ''; },
-  set(token, name, role) {
+  get accountType() { return localStorage.getItem('rs_account_type') || 'recruiter'; },
+  set(token, name, role, accountType) {
     localStorage.setItem('rs_token', token);
     localStorage.setItem('rs_name', name);
     localStorage.setItem('rs_role', role);
+    localStorage.setItem('rs_account_type', accountType);
   },
   clear() {
     localStorage.removeItem('rs_token');
     localStorage.removeItem('rs_name');
     localStorage.removeItem('rs_role');
+    localStorage.removeItem('rs_account_type');
   },
 };
 
@@ -454,6 +457,9 @@ function showLogin(msg) {
   $('usersBtn').classList.add('hidden');
   $('dashBtn').classList.add('hidden');
   $('logoutBtn').classList.add('hidden');
+  // reflect last-used login tab
+  document.querySelectorAll('#loginMode .seg-btn').forEach((b) =>
+    b.classList.toggle('active', b.dataset.mode === getLoginTab()));
   $('whoami').textContent = '';
   const err = $('loginError');
   if (msg) { err.textContent = msg; err.classList.remove('hidden'); }
@@ -464,10 +470,24 @@ function showLogin(msg) {
 function hideLogin() {
   $('loginOverlay').style.display = 'none';
   $('logoutBtn').classList.remove('hidden');
-  $('whoami').textContent = `${auth.name} · ${auth.role}`;
-  const isAdmin = auth.role === 'admin';
-  $('usersBtn').classList.toggle('hidden', !isAdmin);
+  const acct = auth.accountType;
+  $('whoami').textContent = `${auth.name} · ${acct}`;
+  applyMode(acct);
+}
+
+// ── Mode is fixed by the logged-in account type (no free switching) ──
+// The login-screen tab selects which account TYPE you authenticate as.
+function getLoginTab() { return localStorage.getItem('rs_login_tab') || 'recruiter'; }
+function setLoginTab(m) { localStorage.setItem('rs_login_tab', m); }
+
+function applyMode(mode) {
+  const student = mode === 'student';
+  $('recruiterMain').classList.toggle('hidden', student);
+  $('studentMain').classList.toggle('hidden', !student);
+  // admin tools only for recruiter admins
+  const isAdmin = auth.role === 'admin' && !student;
   $('dashBtn').classList.toggle('hidden', !isAdmin);
+  $('usersBtn').classList.toggle('hidden', !isAdmin);
 }
 
 async function doLogin(e) {
@@ -480,11 +500,11 @@ async function doLogin(e) {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ name, password, account_type: getLoginTab() }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || 'Login failed');
-    auth.set(data.token, data.name, data.role);
+    auth.set(data.token, data.name, data.role, data.account_type);
     $('loginPass').value = '';
     hideLogin();
     await startApp();
@@ -517,9 +537,14 @@ async function loadUsers() {
   users.forEach((u) => {
     const row = document.createElement('div');
     row.className = 'user-row';
+    const t = u.account_type || 'recruiter';
     row.innerHTML = `
       <input class="u-name" value="${escapeAttr(u.name)}" />
       <input class="u-pass" value="${escapeAttr(u.password)}" />
+      <select class="u-type">
+        <option value="recruiter" ${t === 'recruiter' ? 'selected' : ''}>recruiter</option>
+        <option value="student" ${t === 'student' ? 'selected' : ''}>student</option>
+      </select>
       <select class="u-role">
         <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
@@ -535,6 +560,7 @@ async function loadUsers() {
             name: row.querySelector('.u-name').value.trim(),
             password: row.querySelector('.u-pass').value,
             role: row.querySelector('.u-role').value,
+            account_type: row.querySelector('.u-type').value,
           }),
         });
         await loadUsers();
@@ -553,12 +579,13 @@ async function addUser() {
   const name = $('newUserName').value.trim();
   const password = $('newUserPass').value;
   const role = $('newUserRole').value;
+  const account_type = $('newUserType').value;
   if (!name || !password) { alert('Enter a username and password.'); return; }
   try {
     await api('/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, password, role }),
+      body: JSON.stringify({ name, password, role, account_type }),
     });
     $('newUserName').value = ''; $('newUserPass').value = '';
     await loadUsers();
@@ -622,6 +649,157 @@ $('addUserBtn').onclick = addUser;
 $('dashBtn').onclick = openDashboard;
 $('closeDash').onclick = () => $('dashModal').classList.add('hidden');
 $('dashRefresh').onclick = loadDashboard;
+
+// login tab wiring — picks which account TYPE you authenticate as
+document.querySelectorAll('#loginMode .seg-btn').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('#loginMode .seg-btn').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    setLoginTab(b.dataset.mode);
+    stErr2(b.dataset.mode);
+  };
+});
+
+// hint which seeded account to use per tab (optional helper)
+function stErr2(mode) {
+  $('loginName').placeholder = mode === 'student' ? 'student' : 'username';
+}
+
+// ════════════ STUDENT COACH FLOW ════════════
+const student = { cvText: '', cvName: '', questions: [] };
+
+function stErr(msg) {
+  const e = $('stError');
+  if (!msg) { e.classList.add('hidden'); return; }
+  e.textContent = msg; e.classList.remove('hidden');
+}
+
+function liList(el, items, cls) {
+  el.innerHTML = items.length
+    ? items.map((t) => `<li${cls ? ` class="${cls}"` : ''}>${escapeHtml(t)}</li>`).join('')
+    : '<li class="muted">—</li>';
+}
+
+async function stUploadCv(file) {
+  $('stCvName').textContent = `Reading ${file.name}…`;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const data = await api('/student/cv', { method: 'POST', body: form });
+    student.cvText = data.cv_text;
+    student.cvName = data.filename;
+    $('stCvName').textContent = `✓ ${data.filename}`;
+    stErr('');
+  } catch (e) {
+    student.cvText = '';
+    $('stCvName').textContent = 'No CV uploaded yet.';
+    stErr(e.message);
+  }
+}
+
+async function stAnalyze() {
+  const jd = $('stJd').value.trim();
+  if (jd.length < 20) return stErr('Paste the target job description first.');
+  if (student.cvText.length < 20) return stErr('Upload your CV first.');
+  stErr('');
+  const btn = $('stAnalyzeBtn');
+  btn.disabled = true; btn.textContent = 'Analyzing…';
+  try {
+    const a = await api('/student/analyze', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jd, cv_text: student.cvText }),
+    });
+    renderAnalysis(a);
+  } catch (e) { stErr(e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Analyze my CV'; }
+}
+
+function renderAnalysis(a) {
+  $('stAnalysis').classList.remove('hidden');
+  const color = a.match_score >= 75 ? 'var(--green)' : a.match_score >= 50 ? 'var(--amber)' : 'var(--red)';
+  const badge = $('stScoreBadge');
+  badge.textContent = a.match_score;
+  badge.style.background = hexFade(color); badge.style.color = color;
+  const vmap = { strong: 'Strong match', needs_work: 'Needs work', weak: 'Weak match' };
+  $('stVerdict').textContent = vmap[a.verdict] || a.verdict;
+  $('stSummary').textContent = a.summary;
+  liList($('stStrengths'), a.strengths, 'li-good');
+  liList($('stGaps'), a.gaps, 'li-bad');
+  liList($('stSuggest'), a.suggestions);
+  $('stKeywords').innerHTML = a.missing_keywords.length
+    ? a.missing_keywords.map((k) => `<span class="chip">${escapeHtml(k)}</span>`).join('')
+    : '<span class="muted">—</span>';
+
+  // clarifying questions
+  student.questions = a.clarifying_questions || [];
+  if (student.questions.length) {
+    $('stQuestions').classList.remove('hidden');
+    $('stQList').innerHTML = student.questions.map((q, i) => `
+      <div class="st-q">
+        <div class="st-q-label">${i + 1}. ${escapeHtml(q)}</div>
+        <textarea class="st-q-input" data-qi="${i}" rows="2" placeholder="Your answer (optional)…"></textarea>
+      </div>`).join('');
+  } else {
+    $('stQuestions').classList.add('hidden');
+  }
+  $('stAnalysis').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function stTailor() {
+  const jd = $('stJd').value.trim();
+  const answers = student.questions.map((q, i) => ({
+    question: q,
+    answer: (document.querySelector(`.st-q-input[data-qi="${i}"]`)?.value || '').trim(),
+  }));
+  const btn = $('stTailorBtn');
+  btn.disabled = true; btn.textContent = 'Rewriting…';
+  try {
+    const t = await api('/student/tailor', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jd, cv_text: student.cvText, answers }),
+    });
+    $('stResume').classList.remove('hidden');
+    $('stResumeText').textContent = t.resume_markdown;
+    liList($('stChanges'), t.change_notes);
+    $('stResume').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { stErr(e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Tailor my resume'; }
+}
+
+async function stPrep() {
+  const jd = $('stJd').value.trim();
+  if (jd.length < 20) return stErr('Paste the target job description first.');
+  const btn = $('stPrepBtn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try {
+    const p = await api('/student/prep', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jd, cv_text: student.cvText }),
+    });
+    $('stPrep').classList.remove('hidden');
+    $('stConcepts').innerHTML = p.key_concepts.length
+      ? p.key_concepts.map((c) => `<div class="prep-item"><b>${escapeHtml(c.topic)}</b>${c.why ? ` — <span class="muted">${escapeHtml(c.why)}</span>` : ''}</div>`).join('')
+      : '<p class="muted">—</p>';
+    $('stQuestionsPrep').innerHTML = p.questions.length
+      ? p.questions.map((q) => `<div class="prep-item">• ${escapeHtml(q.question)}${q.answer_hint ? `<div class="muted prep-hint">↳ ${escapeHtml(q.answer_hint)}</div>` : ''}</div>`).join('')
+      : '<p class="muted">—</p>';
+    liList($('stProjectTips'), p.project_tips);
+  } catch (e) { stErr(e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Generate prep'; }
+}
+
+// student wiring
+$('stCvInput').onchange = (e) => { if (e.target.files[0]) stUploadCv(e.target.files[0]); e.target.value = ''; };
+$('stAnalyzeBtn').onclick = stAnalyze;
+$('stTailorBtn').onclick = stTailor;
+$('stPrepBtn').onclick = stPrep;
+$('stCopyResume').onclick = () => navigator.clipboard.writeText($('stResumeText').textContent || '');
+$('stDownloadResume').onclick = () => {
+  const blob = new Blob([$('stResumeText').textContent || ''], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'tailored-resume.md'; a.click();
+  URL.revokeObjectURL(a.href);
+};
 
 // ── Boot ──
 async function startApp() {

@@ -12,6 +12,10 @@
     <form id="loginForm" class="login-card">
       <div class="brand login-brand"><span class="brand-mark">⛨</span> Ranbval Resume Shortlister</div>
       <p class="muted">Sign in to continue.</p>
+      <div class="seg" id="loginMode">
+        <button type="button" class="seg-btn active" data-mode="recruiter">I'm a Recruiter</button>
+        <button type="button" class="seg-btn" data-mode="student">I'm a Student</button>
+      </div>
       <label>Username</label>
       <input id="loginName" type="text" autocomplete="username" autofocus />
       <label>Password</label>
@@ -60,6 +64,10 @@
       <div class="add-user-row">
         <input id="newUserName" type="text" placeholder="username" />
         <input id="newUserPass" type="text" placeholder="password" />
+        <select id="newUserType">
+          <option value="recruiter">recruiter</option>
+          <option value="student">student</option>
+        </select>
         <select id="newUserRole">
           <option value="user">user</option>
           <option value="admin">admin</option>
@@ -70,7 +78,8 @@
     </div>
   </div>
 
-  <main class="layout">
+  <!-- ════ RECRUITER MODE ════ -->
+  <main class="layout" id="recruiterMain">
     <!-- LEFT: jobs -->
     <aside class="sidebar">
       <div class="sidebar-head">
@@ -167,6 +176,82 @@
         <div id="candidateList" class="candidate-list"></div>
       </div>
     </section>
+  </main>
+
+  <!-- ════ STUDENT MODE ════ -->
+  <main class="student-main hidden" id="studentMain">
+    <div class="student-wrap">
+      <div class="card">
+        <h2>Career Coach — tailor your CV to a job</h2>
+        <p class="muted">Paste the job you're targeting, upload your CV, and get an honest gap analysis, a rewritten resume, and interview prep.</p>
+        <label>Target job description</label>
+        <textarea id="stJd" rows="8" placeholder="Paste the full JD you want to apply for…"></textarea>
+        <div class="student-cv-row">
+          <label class="btn btn-primary file-btn">
+            <input id="stCvInput" type="file" accept=".pdf,.docx,.txt" hidden />
+            Upload your CV
+          </label>
+          <span id="stCvName" class="muted">No CV uploaded yet.</span>
+        </div>
+        <div class="row-end">
+          <button id="stAnalyzeBtn" class="btn btn-primary">Analyze my CV</button>
+        </div>
+        <div id="stError" class="login-error hidden"></div>
+      </div>
+
+      <!-- Analysis result -->
+      <div id="stAnalysis" class="card hidden">
+        <div class="st-score-head">
+          <div id="stScoreBadge" class="score-badge"></div>
+          <div>
+            <h3 id="stVerdict" style="margin:0;"></h3>
+            <p id="stSummary" class="muted" style="margin:4px 0 0;"></p>
+          </div>
+        </div>
+        <div class="detail-grid" style="margin-top:16px;">
+          <div class="detail-block"><h4>✓ Strengths</h4><ul id="stStrengths"></ul></div>
+          <div class="detail-block"><h4>✗ Gaps vs JD</h4><ul id="stGaps"></ul></div>
+        </div>
+        <div class="detail-block" style="margin-top:14px;"><h4>Missing keywords</h4><div id="stKeywords" class="chips"></div></div>
+        <div class="detail-block" style="margin-top:14px;"><h4>Suggestions</h4><ul id="stSuggest"></ul></div>
+      </div>
+
+      <!-- Clarifying questions -->
+      <div id="stQuestions" class="card hidden">
+        <h3>A few questions, then I'll rewrite your resume</h3>
+        <p class="muted">Answer what you can — I'll only use real info (no fabrication).</p>
+        <div id="stQList" class="st-qlist"></div>
+        <div class="row-end">
+          <button id="stTailorBtn" class="btn btn-primary">Tailor my resume</button>
+        </div>
+      </div>
+
+      <!-- Tailored resume -->
+      <div id="stResume" class="card hidden">
+        <div class="results-head">
+          <h3>Your tailored resume</h3>
+          <div style="display:flex;gap:8px;">
+            <button id="stCopyResume" class="btn btn-ghost">Copy</button>
+            <button id="stDownloadResume" class="btn btn-ghost">Download</button>
+          </div>
+        </div>
+        <pre id="stResumeText" class="jd-box" style="max-height:480px;"></pre>
+        <div class="detail-block" style="margin-top:8px;"><h4>What changed</h4><ul id="stChanges"></ul></div>
+      </div>
+
+      <!-- Interview prep -->
+      <div class="card">
+        <div class="results-head">
+          <h3>Interview prep</h3>
+          <button id="stPrepBtn" class="btn btn-primary">Generate prep</button>
+        </div>
+        <div id="stPrep" class="hidden">
+          <div class="detail-block"><h4>Key concepts to study</h4><div id="stConcepts"></div></div>
+          <div class="detail-block" style="margin-top:16px;"><h4>Likely questions (incl. the small ones)</h4><div id="stQuestionsPrep"></div></div>
+          <div class="detail-block" style="margin-top:16px;"><h4>Be ready to explain in YOUR projects</h4><ul id="stProjectTips"></ul></div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="/static/app.js"></script>
