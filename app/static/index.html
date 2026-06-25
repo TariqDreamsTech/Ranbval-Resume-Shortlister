@@ -171,9 +171,9 @@
             <option value="30">Last 30 days</option>
           </select>
           <select id="filterSort" class="filter-select" title="Sort">
+            <option value="newest">Newest first</option>
             <option value="best">Best match</option>
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
+            <option value="oldest">Oldest first</option>
             <option value="score_asc">Lowest score</option>
           </select>
           <button id="clearFilters" class="btn btn-ghost">Clear</button>
@@ -182,7 +182,26 @@
         <div id="candidateList" class="candidate-list"></div>
       </div>
     </section>
+
+    <!-- RIGHT: top 5 for the opened job -->
+    <aside class="top5-panel" id="top5Panel">
+      <h3 class="top5-head">Top 5 · this job</h3>
+      <div id="top5List" class="top5-list"></div>
+      <div id="tieNote" class="tie-note hidden"></div>
+      <button id="askInterviewBtn" class="btn btn-primary hidden" style="width:100%;margin-top:12px;">🎯 Ask Ranbval who to interview</button>
+    </aside>
   </main>
+
+  <!-- Interview recommendation modal -->
+  <div id="interviewModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Who to interview</h2>
+        <button id="closeInterview" class="btn btn-ghost">✕</button>
+      </div>
+      <div id="interviewBody"></div>
+    </div>
+  </div>
 
   <!-- ════ STUDENT MODE ════ -->
   <main class="student-main hidden" id="studentMain">

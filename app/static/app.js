@@ -138,7 +138,7 @@ function resetFilters() {
   $('candSearch').value = '';
   $('filterVerdict').value = '';
   $('filterDate').value = '';
-  $('filterSort').value = 'best';
+  $('filterSort').value = 'newest';  // last uploaded shows first by default
 }
 
 // ── Candidates ──
@@ -204,12 +204,98 @@ function renderCandidates() {
   $('candCount').textContent = shown.length === allCandidates.length
     ? String(allCandidates.length)
     : `${shown.length} / ${allCandidates.length}`;
+  renderTop5();
   if (shown.length === 0) {
     list.innerHTML = '<p class="muted">No candidates match these filters.</p>';
     return;
   }
   shown.forEach((c) => list.appendChild(renderCandidate(c)));
 }
+
+// Top 5 scored candidates of the CURRENTLY OPEN job (best first).
+function renderTop5() {
+  const box = $('top5List');
+  if (!box) return;
+  const done = allCandidates.filter((c) => c.status === 'done');
+  const top = done
+    .slice()
+    .sort((a, b) => (b.recommended - a.recommended) || (b.score - a.score))
+    .slice(0, 5);
+  if (top.length === 0) {
+    box.innerHTML = '<p class="muted" style="font-size:0.8rem;">No scored candidates yet.</p>';
+    $('askInterviewBtn').classList.add('hidden');
+    $('tieNote').classList.add('hidden');
+    return;
+  }
+
+  // Detect ties / near-ties within the top group.
+  const scores = top.map((c) => c.score);
+  const hasTie = new Set(scores).size < scores.length;
+  const nearTie = top.some((c, i) => i > 0 && Math.abs(c.score - top[i - 1].score) <= 3);
+  const tieNote = $('tieNote');
+  if (hasTie || nearTie) {
+    tieNote.textContent = hasTie
+      ? 'Some candidates are tied on score — let Ranbval break the tie.'
+      : 'Top scores are very close — let Ranbval pick who to interview.';
+    tieNote.classList.remove('hidden');
+  } else {
+    tieNote.classList.add('hidden');
+  }
+  // Need ≥2 scored candidates to compare.
+  $('askInterviewBtn').classList.toggle('hidden', done.length < 2);
+  box.innerHTML = top.map((c, i) => {
+    const col = scoreColor(c.score);
+    return `<div class="t5-row" data-cid="${c.id}">
+      <span class="t5-rank">${i + 1}</span>
+      <span class="t5-badge" style="background:${hexFade(col)};color:${col}">${c.score}</span>
+      <span class="t5-info">
+        <span class="t5-name">${escapeHtml(c.candidate_name || c.filename)}</span>
+        <span class="t5-verdict v-${c.verdict}">${c.recommended ? '★ ' : ''}${c.verdict}</span>
+      </span>
+    </div>`;
+  }).join('');
+  // click a row → scroll to and open that candidate's card
+  box.querySelectorAll('.t5-row').forEach((r) => {
+    r.onclick = () => {
+      const card = document.querySelector(`#candidateList .cand [data-del="${r.dataset.cid}"]`)?.closest('.cand')
+        || [...document.querySelectorAll('#candidateList .cand')].find((el) => el.dataset.cid === r.dataset.cid);
+      if (card) { card.classList.add('open'); card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    };
+  });
+}
+
+// Ask Ranbval to compare the top candidates and recommend who to interview.
+async function askInterview() {
+  if (!activeJobId) return;
+  const btn = $('askInterviewBtn');
+  btn.disabled = true; btn.textContent = 'Analyzing…';
+  $('interviewBody').innerHTML = '<p class="muted">Comparing top candidates against the JD…</p>';
+  $('interviewModal').classList.remove('hidden');
+  try {
+    const rec = await api(`/jobs/${activeJobId}/recommend-interview`, { method: 'POST' });
+    const decColor = { interview: 'var(--green)', backup: 'var(--amber)', skip: 'var(--red)' };
+    const rows = (rec.ranking || []).map((r) => `
+      <div class="iv-row">
+        <span class="iv-rank">#${r.rank || '?'}</span>
+        <div class="iv-main">
+          <div class="iv-name">${escapeHtml(r.name || 'Candidate')}
+            <span class="iv-dec" style="color:${decColor[r.decision] || 'var(--muted)'}">${r.decision}</span>
+          </div>
+          <div class="iv-reason">${escapeHtml(r.reason || '')}</div>
+        </div>
+      </div>`).join('');
+    $('interviewBody').innerHTML =
+      `<div class="iv-verdict">${escapeHtml(rec.verdict || '')}</div>` +
+      `<div class="iv-list">${rows || '<p class="muted">No ranking returned.</p>'}</div>`;
+  } catch (e) {
+    $('interviewBody').innerHTML = `<p class="login-error">${escapeHtml(e.message)}</p>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '🎯 Ask Ranbval who to interview';
+  }
+}
+
+$('askInterviewBtn').onclick = askInterview;
+$('closeInterview').onclick = () => $('interviewModal').classList.add('hidden');
 
 function scoreColor(score) {
   if (score >= 80) return 'var(--green)';
@@ -221,8 +307,19 @@ function scoreColor(score) {
 function renderInsights(c) {
   let html = '';
 
-  // seniority + years vs JD
+  const icon = { met: '✓', partial: '≈', missing: '✗' };
+  const reqRows = (list) => list.map((r) => `
+    <div class="req-row req-${r.status}">
+      <span class="req-ic">${icon[r.status] || '✗'}</span>
+      <span class="req-text"><b>${escapeHtml(r.requirement)}</b>${r.evidence ? `<span class="muted req-ev"> — ${escapeHtml(r.evidence)}</span>` : ''}</span>
+    </div>`).join('');
+
+  // chips: confidence, seniority, years vs JD
   const chips = [];
+  if (c.confidence) {
+    const cc = { high: 'var(--green)', medium: 'var(--amber)', low: 'var(--red)' }[c.confidence] || 'var(--muted)';
+    chips.push(`<div class="ins-chip"><span class="muted">Confidence:</span> <b style="color:${cc}">${escapeHtml(c.confidence)}</b></div>`);
+  }
   if (c.seniority_required || c.seniority_detected) {
     chips.push(`<div class="ins-chip"><span class="muted">Seniority:</span> ${escapeHtml(c.seniority_detected || '—')} <span class="muted">vs JD</span> ${escapeHtml(c.seniority_required || '—')}</div>`);
   }
@@ -233,17 +330,18 @@ function renderInsights(c) {
   }
   if (chips.length) html += `<div class="ins-chips">${chips.join('')}</div>`;
 
-  // JD requirements scorecard
+  // Must-have requirements scorecard
   const reqs = c.requirements || [];
   if (reqs.length) {
-    const icon = { met: '✓', partial: '≈', missing: '✗' };
     const met = reqs.filter((r) => r.status === 'met').length;
-    const rows = reqs.map((r) => `
-      <div class="req-row req-${r.status}">
-        <span class="req-ic">${icon[r.status] || '✗'}</span>
-        <span class="req-text"><b>${escapeHtml(r.requirement)}</b>${r.evidence ? `<span class="muted req-ev"> — ${escapeHtml(r.evidence)}</span>` : ''}</span>
-      </div>`).join('');
-    html += `<div class="detail-block" style="margin-top:14px;"><h4>JD requirements — ${met}/${reqs.length} met</h4><div class="req-list">${rows}</div></div>`;
+    html += `<div class="detail-block" style="margin-top:14px;"><h4>Must-have requirements — ${met}/${reqs.length} met</h4><div class="req-list">${reqRows(reqs)}</div></div>`;
+  }
+
+  // Nice-to-have requirements
+  const nice = c.nice_to_have || [];
+  if (nice.length) {
+    const met = nice.filter((r) => r.status === 'met').length;
+    html += `<div class="detail-block" style="margin-top:14px;"><h4>Nice-to-have — ${met}/${nice.length} met</h4><div class="req-list">${reqRows(nice)}</div></div>`;
   }
 
   // interview focus areas

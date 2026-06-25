@@ -18,9 +18,11 @@ from app.deps import require_recruiter
 from app.schemas import (
     BatchUploadOut,
     CandidateOut,
+    InterviewRecOut,
     ProcessOut,
     QueueStatusOut,
 )
+from app.services import interview
 from app.services.extract import extract_text
 from app.services.scoring import async_client, score_one_async
 
@@ -147,7 +149,9 @@ async def process_queue(job_id: int) -> ProcessOut:
                         "seniority_detected": result.get("seniority_detected"),
                         "measurements": result.get("measurements", {}),
                         "requirements": result.get("requirements", []),
+                        "nice_to_have": result.get("nice_to_have", []),
                         "interview_focus": result.get("interview_focus", []),
+                        "confidence": result.get("confidence"),
                     },
                 }
             ).eq("id", cid).execute()
@@ -188,6 +192,33 @@ def queue_status(job_id: int) -> QueueStatusOut:
     d = _count(client, job_id, "done")
     e = _count(client, job_id, "error")
     return QueueStatusOut(queued=q, processing=p, done=d, error=e, total=q + p + d + e)
+
+
+@router.post("/recommend-interview", response_model=InterviewRecOut)
+def recommend_interview_route(job_id: int) -> InterviewRecOut:
+    """Compare this job's top scored candidates and recommend who to interview."""
+    client = get_client()
+    job = _get_job(client, job_id)
+    rows = (
+        client.table(CANDIDATES_TABLE)
+        .select("*")
+        .eq("job_id", job_id)
+        .eq("status", "done")
+        .order("recommended", desc=True)
+        .order("score", desc=True)
+        .limit(5)
+        .execute()
+        .data
+        or []
+    )
+    if len(rows) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Need at least 2 scored candidates to compare.",
+        )
+    cands = [_to_candidate_out(r).model_dump() for r in rows]
+    result = interview.recommend_interview(job["title"], job["description"], cands)
+    return InterviewRecOut(**result)
 
 
 @router.get("/candidates", response_model=list[CandidateOut])
@@ -288,6 +319,8 @@ def _to_candidate_out(row: dict) -> CandidateOut:
         seniority_detected=details.get("seniority_detected"),
         measurements=details.get("measurements", {}),
         requirements=details.get("requirements", []),
+        nice_to_have=details.get("nice_to_have", []),
         interview_focus=details.get("interview_focus", []),
+        confidence=row.get("confidence") or details.get("confidence"),
         created_at=str(row.get("created_at", "")),
     )

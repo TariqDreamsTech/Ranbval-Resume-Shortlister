@@ -58,6 +58,7 @@ class RequirementItem(BaseModel):
     requirement: str
     status: str = "missing"  # met | partial | missing
     evidence: str = ""
+    location: str = ""
 
 
 class CandidateOut(BaseModel):
@@ -68,6 +69,7 @@ class CandidateOut(BaseModel):
     score: int
     verdict: str
     recommended: bool
+    confidence: str | None = None
     status: str = "done"  # queued | processing | done | error
     error: str | None = None
     summary: str | None = None
@@ -81,8 +83,22 @@ class CandidateOut(BaseModel):
     seniority_detected: str | None = None
     measurements: dict[str, int] = {}
     requirements: list[RequirementItem] = []
+    nice_to_have: list[RequirementItem] = []
     interview_focus: list[str] = []
     created_at: str
+
+
+class InterviewRankItem(BaseModel):
+    candidate_id: int
+    name: str
+    rank: int
+    decision: str  # interview | backup | skip
+    reason: str = ""
+
+
+class InterviewRecOut(BaseModel):
+    ranking: list[InterviewRankItem] = []
+    verdict: str = ""
 
 
 class BatchUploadOut(BaseModel):
