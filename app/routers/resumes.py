@@ -204,8 +204,8 @@ def recommend_interview_route(job_id: int) -> InterviewRecOut:
         .select("*")
         .eq("job_id", job_id)
         .eq("status", "done")
-        .order("recommended", desc=True)
         .order("score", desc=True)
+        .order("recommended", desc=True)
         .limit(5)
         .execute()
         .data
