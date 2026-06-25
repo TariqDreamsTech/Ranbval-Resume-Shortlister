@@ -99,6 +99,12 @@
         <input id="jobTitle" type="text" placeholder="e.g. Senior Backend Engineer (Python)" />
         <label>Job description (paste the full JD — the stricter the better)</label>
         <textarea id="jobDesc" rows="12" placeholder="Responsibilities, must-have skills, minimum years, required tech, qualifications…"></textarea>
+        <label>Shortlist threshold — minimum score to shortlist (higher = stricter)</label>
+        <div class="thresh-row">
+          <input id="jobThreshold" type="range" min="60" max="100" value="90" />
+          <span id="jobThresholdVal" class="thresh-val">90</span>
+        </div>
+        <p class="muted" style="margin:2px 0 0;font-size:0.76rem;">90+ = only near-perfect, interview-ready matches get shortlisted.</p>
         <div class="row-end">
           <button id="cancelJobBtn" class="btn btn-ghost">Cancel</button>
           <button id="saveJobBtn" class="btn btn-primary">Create job</button>

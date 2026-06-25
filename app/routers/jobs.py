@@ -12,11 +12,18 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(requ
 @router.post("", response_model=JobOut)
 def create_job(body: JobCreate) -> JobOut:
     client = get_client()
-    res = (
-        client.table(JOBS_TABLE)
-        .insert({"title": body.title.strip(), "description": body.description.strip()})
-        .execute()
-    )
+    row = {
+        "title": body.title.strip(),
+        "description": body.description.strip(),
+        "threshold": body.threshold,
+    }
+    try:
+        res = client.table(JOBS_TABLE).insert(row).execute()
+    except Exception:
+        # `threshold` column not migrated yet — fall back to global default.
+        res = client.table(JOBS_TABLE).insert(
+            {k: v for k, v in row.items() if k != "threshold"}
+        ).execute()
     if not res.data:
         raise HTTPException(status_code=502, detail="Failed to create job")
     return _to_job_out(res.data[0], candidate_count=0)
@@ -78,6 +85,7 @@ def _to_job_out(row: dict, candidate_count: int) -> JobOut:
         id=row["id"],
         title=row["title"],
         description=row["description"],
+        threshold=row.get("threshold", 90) or 90,
         created_at=str(row.get("created_at", "")),
         candidate_count=candidate_count,
     )

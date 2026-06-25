@@ -105,6 +105,8 @@ async def process_queue(job_id: int) -> ProcessOut:
     oai = async_client()
     sem = asyncio.Semaphore(settings.process_concurrency)
 
+    job_threshold = job.get("threshold") or settings.shortlist_threshold
+
     async def _score(row: dict):
         async with sem:
             try:
@@ -113,6 +115,7 @@ async def process_queue(job_id: int) -> ProcessOut:
                     job_title=job["title"],
                     job_description=job["description"],
                     resume_text=row.get("resume_text") or "",
+                    threshold=job_threshold,
                 )
                 return row["id"], result, None
             except Exception as e:  # noqa: BLE001
@@ -139,6 +142,12 @@ async def process_queue(job_id: int) -> ProcessOut:
                         "red_flags": result["red_flags"],
                         "key_skills": result["key_skills"],
                         "years_experience": result["years_experience"],
+                        "years_required": result.get("years_required"),
+                        "seniority_required": result.get("seniority_required"),
+                        "seniority_detected": result.get("seniority_detected"),
+                        "measurements": result.get("measurements", {}),
+                        "requirements": result.get("requirements", []),
+                        "interview_focus": result.get("interview_focus", []),
                     },
                 }
             ).eq("id", cid).execute()
@@ -274,5 +283,11 @@ def _to_candidate_out(row: dict) -> CandidateOut:
         red_flags=details.get("red_flags", []),
         key_skills=details.get("key_skills", []),
         years_experience=details.get("years_experience"),
+        years_required=details.get("years_required"),
+        seniority_required=details.get("seniority_required"),
+        seniority_detected=details.get("seniority_detected"),
+        measurements=details.get("measurements", {}),
+        requirements=details.get("requirements", []),
+        interview_focus=details.get("interview_focus", []),
         created_at=str(row.get("created_at", "")),
     )

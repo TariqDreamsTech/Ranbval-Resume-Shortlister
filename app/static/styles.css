@@ -168,6 +168,43 @@ input:-webkit-autofill:focus {
 .row-end { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 .file-btn { display: inline-flex; align-items: center; }
 
+/* Threshold slider */
+.thresh-row { display: flex; align-items: center; gap: 14px; }
+.thresh-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.thresh-val {
+  font-weight: 800; font-size: 1.1rem; color: var(--accent-2);
+  min-width: 38px; text-align: right;
+}
+
+/* Measurement bars */
+.meas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
+.meas-top { display: flex; justify-content: space-between; font-size: 0.76rem; margin-bottom: 4px; }
+.meas-top span:first-child { color: var(--muted); }
+.meas-top span:last-child { font-weight: 700; }
+.meas-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,.07); overflow: hidden; }
+.meas-fill { height: 100%; border-radius: 4px; transition: width .3s ease; }
+@media (max-width: 560px) { .meas-grid { grid-template-columns: 1fr; } }
+
+/* Insight chips (seniority / years vs JD) */
+.ins-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.ins-chip {
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 11px; font-size: 0.78rem; color: var(--text);
+}
+
+/* JD requirements scorecard */
+.req-list { display: flex; flex-direction: column; gap: 5px; }
+.req-row { display: flex; align-items: flex-start; gap: 9px; font-size: 0.82rem; line-height: 1.45; }
+.req-ic {
+  flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px;
+  display: grid; place-items: center; font-size: 0.72rem; font-weight: 800; margin-top: 1px;
+}
+.req-met .req-ic { background: rgba(54,211,153,.18); color: var(--green); }
+.req-partial .req-ic { background: rgba(251,191,36,.18); color: var(--amber); }
+.req-missing .req-ic { background: rgba(248,113,113,.18); color: var(--red); }
+.req-text { color: var(--text); }
+.req-ev { font-weight: 400; }
+
 /* Empty */
 .empty { text-align: center; color: var(--muted); margin-top: 80px; }
 .empty-icon { font-size: 46px; margin-bottom: 12px; }

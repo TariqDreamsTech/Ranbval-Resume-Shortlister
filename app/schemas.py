@@ -42,14 +42,22 @@ class UserUpdate(BaseModel):
 class JobCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     description: str = Field(min_length=20)
+    threshold: int = Field(default=90, ge=1, le=100)
 
 
 class JobOut(BaseModel):
     id: int
     title: str
     description: str
+    threshold: int = 90
     created_at: str
     candidate_count: int = 0
+
+
+class RequirementItem(BaseModel):
+    requirement: str
+    status: str = "missing"  # met | partial | missing
+    evidence: str = ""
 
 
 class CandidateOut(BaseModel):
@@ -68,6 +76,12 @@ class CandidateOut(BaseModel):
     red_flags: list[str] = []
     key_skills: list[str] = []
     years_experience: float | None = None
+    years_required: float | None = None
+    seniority_required: str | None = None
+    seniority_detected: str | None = None
+    measurements: dict[str, int] = {}
+    requirements: list[RequirementItem] = []
+    interview_focus: list[str] = []
     created_at: str
 
 

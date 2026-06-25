@@ -86,6 +86,8 @@ function showJobForm() {
   $('jobView').classList.add('hidden');
   $('jobTitle').value = '';
   $('jobDesc').value = '';
+  $('jobThreshold').value = 90;
+  $('jobThresholdVal').textContent = '90';
   $('jobTitle').focus();
 }
 
@@ -102,7 +104,7 @@ async function saveJob() {
     const job = await api('/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify({ title, description, threshold: Number($('jobThreshold').value) }),
     });
     await loadJobs();
     openJob(job.id);
@@ -125,7 +127,7 @@ async function openJob(jobId) {
   $('jvDesc').textContent = job.description;
   $('jvDesc').classList.add('hidden');
   $('toggleJD').textContent = 'View JD';
-  $('threshNote').textContent = `Shortlist threshold: ${threshold}/100`;
+  $('threshNote').textContent = `Shortlist threshold: ${job.threshold ?? threshold}/100 (90+ = interview-ready only)`;
   resetFilters();
   await loadCandidates();
   await loadJobs();
@@ -215,6 +217,43 @@ function scoreColor(score) {
   return 'var(--red)';
 }
 
+// Rich JD-grounded insights block for a scored candidate.
+function renderInsights(c) {
+  let html = '';
+
+  // seniority + years vs JD
+  const chips = [];
+  if (c.seniority_required || c.seniority_detected) {
+    chips.push(`<div class="ins-chip"><span class="muted">Seniority:</span> ${escapeHtml(c.seniority_detected || '—')} <span class="muted">vs JD</span> ${escapeHtml(c.seniority_required || '—')}</div>`);
+  }
+  if (c.years_required != null || c.years_experience != null) {
+    const ye = c.years_experience != null ? c.years_experience : '—';
+    const yr = c.years_required != null ? c.years_required : '—';
+    chips.push(`<div class="ins-chip"><span class="muted">Experience:</span> ${ye} yrs <span class="muted">vs JD</span> ${yr} yrs</div>`);
+  }
+  if (chips.length) html += `<div class="ins-chips">${chips.join('')}</div>`;
+
+  // JD requirements scorecard
+  const reqs = c.requirements || [];
+  if (reqs.length) {
+    const icon = { met: '✓', partial: '≈', missing: '✗' };
+    const met = reqs.filter((r) => r.status === 'met').length;
+    const rows = reqs.map((r) => `
+      <div class="req-row req-${r.status}">
+        <span class="req-ic">${icon[r.status] || '✗'}</span>
+        <span class="req-text"><b>${escapeHtml(r.requirement)}</b>${r.evidence ? `<span class="muted req-ev"> — ${escapeHtml(r.evidence)}</span>` : ''}</span>
+      </div>`).join('');
+    html += `<div class="detail-block" style="margin-top:14px;"><h4>JD requirements — ${met}/${reqs.length} met</h4><div class="req-list">${rows}</div></div>`;
+  }
+
+  // interview focus areas
+  const foc = c.interview_focus || [];
+  if (foc.length) {
+    html += `<div class="detail-block" style="margin-top:14px;"><h4>Interview focus (probe these)</h4><ul>${foc.map((f) => `<li>${escapeHtml(f)}</li>`).join('')}</ul></div>`;
+  }
+  return html;
+}
+
 function renderCandidate(c) {
   // Not-yet-scored states get a compact card.
   if (c.status === 'queued' || c.status === 'processing') {
@@ -261,6 +300,23 @@ function renderCandidate(c) {
   const skills = (c.key_skills || []).map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join('');
   const years = c.years_experience != null ? `${c.years_experience} yrs exp` : 'exp N/A';
 
+  const measureLabels = {
+    skills_match: 'Skills', experience_match: 'Experience', education_match: 'Education',
+    seniority_fit: 'Seniority', domain_relevance: 'Domain', responsibility_match: 'Responsibilities',
+    tools_match: 'Tools', communication: 'Communication',
+  };
+  const m = c.measurements || {};
+  const measureBars = Object.keys(measureLabels)
+    .filter((k) => k in m)
+    .map((k) => {
+      const v = m[k];
+      const col = v >= 80 ? 'var(--green)' : v >= 60 ? 'var(--amber)' : 'var(--red)';
+      return `<div class="meas">
+        <div class="meas-top"><span>${measureLabels[k]}</span><span style="color:${col}">${v}</span></div>
+        <div class="meas-bar"><div class="meas-fill" style="width:${v}%;background:${col}"></div></div>
+      </div>`;
+    }).join('');
+
   el.innerHTML = `
     <div class="cand-top">
       <div class="score-badge" style="background:${hexFade(badgeColor)};color:${badgeColor};">${c.score}</div>
@@ -272,7 +328,9 @@ function renderCandidate(c) {
       <span class="verdict v-${c.verdict}">${c.recommended ? '★ ' : ''}${c.verdict}</span>
     </div>
     <div class="cand-detail">
-      <div class="detail-grid">
+      ${measureBars ? `<div class="detail-block"><h4>Measurements</h4><div class="meas-grid">${measureBars}</div></div>` : ''}
+      ${renderInsights(c)}
+      <div class="detail-grid" style="margin-top:14px;">
         <div class="detail-block">
           <h4>✓ Matched (${(c.matched_requirements || []).length})</h4>
           <ul>${matched || '<li class="muted">—</li>'}</ul>
@@ -430,6 +488,7 @@ $('cancelJobBtn').onclick = () => {
   else $('emptyState').classList.remove('hidden');
 };
 $('saveJobBtn').onclick = saveJob;
+$('jobThreshold').oninput = (e) => { $('jobThresholdVal').textContent = e.target.value; };
 $('toggleJD').onclick = () => {
   const box = $('jvDesc');
   box.classList.toggle('hidden');

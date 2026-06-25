@@ -26,7 +26,7 @@ _load_dotenv()
 class Settings:
     openai_api_key: str = os.environ.get("OPENAI_API_KEY", "").strip()
     openai_model: str = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
-    shortlist_threshold: int = int(os.environ.get("SHORTLIST_THRESHOLD", "75"))
+    shortlist_threshold: int = int(os.environ.get("SHORTLIST_THRESHOLD", "90"))
     # How many queued resumes one /process call claims, and how many OpenAI
     # calls run concurrently within it. Keep BATCH small enough that a single
     # call finishes inside the serverless timeout (Vercel Hobby = 10s).
