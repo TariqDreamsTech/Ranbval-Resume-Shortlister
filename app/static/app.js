@@ -193,6 +193,7 @@ function filteredCandidates() {
 }
 
 function renderCandidates() {
+  renderTop5();  // always keep the Top 5 panel in sync with the latest data
   const list = $('candidateList');
   list.innerHTML = '';
   if (allCandidates.length === 0) {
@@ -204,7 +205,6 @@ function renderCandidates() {
   $('candCount').textContent = shown.length === allCandidates.length
     ? String(allCandidates.length)
     : `${shown.length} / ${allCandidates.length}`;
-  renderTop5();
   if (shown.length === 0) {
     list.innerHTML = '<p class="muted">No candidates match these filters.</p>';
     return;
