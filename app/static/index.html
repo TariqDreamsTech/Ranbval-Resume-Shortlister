@@ -60,6 +60,7 @@
         <h2>Jobs</h2>
         <button id="newJobBtn" class="btn btn-ghost">+ New</button>
       </div>
+      <input id="jobSearch" type="text" class="sidebar-search" placeholder="Search jobs…" />
       <div id="jobList" class="job-list"></div>
     </aside>
 
@@ -113,6 +114,32 @@
           <h3>Candidates <span id="candCount" class="pill">0</span></h3>
           <span class="muted" id="threshNote"></span>
         </div>
+
+        <!-- Filters / search toolbar -->
+        <div class="filters">
+          <input id="candSearch" type="text" class="filter-search" placeholder="Search name, file, or summary…" />
+          <select id="filterVerdict" class="filter-select" title="Verdict">
+            <option value="">All verdicts</option>
+            <option value="recommended">★ Recommended</option>
+            <option value="shortlist">Shortlist</option>
+            <option value="maybe">Maybe</option>
+            <option value="reject">Reject</option>
+          </select>
+          <select id="filterDate" class="filter-select" title="Date added">
+            <option value="">Any time</option>
+            <option value="today">Today</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+          <select id="filterSort" class="filter-select" title="Sort">
+            <option value="best">Best match</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="score_asc">Lowest score</option>
+          </select>
+          <button id="clearFilters" class="btn btn-ghost">Clear</button>
+        </div>
+
         <div id="candidateList" class="candidate-list"></div>
       </div>
     </section>

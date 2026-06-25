@@ -51,6 +51,57 @@ body {
 .sidebar-head h2 { font-size: 0.95rem; margin: 0; }
 .workspace { padding: 22px; max-width: 920px; }
 
+/* Sidebar search */
+.sidebar-search {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 8px 11px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  margin-bottom: 10px;
+}
+.sidebar-search:focus { border-color: rgba(109,106,246,.5); }
+.sidebar-search::placeholder { color: var(--muted); opacity: .7; }
+
+/* Candidate filter toolbar */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.filter-search {
+  flex: 1 1 220px;
+  min-width: 160px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 0.84rem;
+  font-family: inherit;
+  outline: none;
+}
+.filter-search:focus { border-color: rgba(109,106,246,.5); }
+.filter-search::placeholder { color: var(--muted); opacity: .7; }
+.filter-select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  padding: 9px 11px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+.filter-select:focus { border-color: rgba(109,106,246,.5); }
+.filters .btn { padding: 8px 14px; }
+
 /* Job list */
 .job-list { display: flex; flex-direction: column; gap: 6px; }
 .job-item {

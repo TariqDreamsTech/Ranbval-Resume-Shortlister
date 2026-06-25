@@ -47,12 +47,25 @@ async function loadHealth() {
 }
 
 // ── Jobs ──
+let allJobs = [];
+
 async function loadJobs() {
-  const jobs = await api('/jobs');
+  allJobs = await api('/jobs');
+  renderJobs();
+}
+
+function renderJobs() {
+  const q = ($('jobSearch').value || '').trim().toLowerCase();
+  const jobs = q ? allJobs.filter((j) => j.title.toLowerCase().includes(q)) : allJobs;
   const list = $('jobList');
   list.innerHTML = '';
-  if (jobs.length === 0) {
+  if (allJobs.length === 0) {
     list.innerHTML = '<p class="muted" style="padding:4px 6px;">No jobs yet.</p>';
+    return;
+  }
+  if (jobs.length === 0) {
+    list.innerHTML = '<p class="muted" style="padding:4px 6px;">No jobs match.</p>';
+    return;
   }
   jobs.forEach((j) => {
     const el = document.createElement('div');
@@ -110,21 +123,86 @@ async function openJob(jobId) {
   $('jvDesc').classList.add('hidden');
   $('toggleJD').textContent = 'View JD';
   $('threshNote').textContent = `Shortlist threshold: ${threshold}/100`;
+  resetFilters();
   await loadCandidates();
   await loadJobs();
 }
 
+function resetFilters() {
+  $('candSearch').value = '';
+  $('filterVerdict').value = '';
+  $('filterDate').value = '';
+  $('filterSort').value = 'best';
+}
+
 // ── Candidates ──
+let allCandidates = [];
+
 async function loadCandidates() {
-  const cands = await api(`/jobs/${activeJobId}/candidates`);
-  $('candCount').textContent = cands.length;
+  allCandidates = await api(`/jobs/${activeJobId}/candidates`);
+  renderCandidates();
+}
+
+function filteredCandidates() {
+  const q = ($('candSearch').value || '').trim().toLowerCase();
+  const verdict = $('filterVerdict').value;
+  const dateSel = $('filterDate').value;
+  const sort = $('filterSort').value;
+
+  let list = allCandidates.slice();
+
+  // text search across name, filename, summary
+  if (q) {
+    list = list.filter((c) =>
+      [c.candidate_name, c.filename, c.summary]
+        .filter(Boolean)
+        .some((v) => v.toLowerCase().includes(q))
+    );
+  }
+
+  // verdict / recommended
+  if (verdict === 'recommended') list = list.filter((c) => c.recommended);
+  else if (verdict) list = list.filter((c) => c.verdict === verdict);
+
+  // date added
+  if (dateSel) {
+    const now = Date.now();
+    const cutoff = dateSel === 'today'
+      ? new Date(new Date().toDateString()).getTime()
+      : now - Number(dateSel) * 86400000;
+    list = list.filter((c) => {
+      const t = Date.parse(c.created_at);
+      return !isNaN(t) && t >= cutoff;
+    });
+  }
+
+  // sort
+  const ts = (c) => Date.parse(c.created_at) || 0;
+  if (sort === 'newest') list.sort((a, b) => ts(b) - ts(a));
+  else if (sort === 'oldest') list.sort((a, b) => ts(a) - ts(b));
+  else if (sort === 'score_asc') list.sort((a, b) => a.score - b.score);
+  else list.sort((a, b) => (b.recommended - a.recommended) || (b.score - a.score)); // best
+
+  return list;
+}
+
+function renderCandidates() {
   const list = $('candidateList');
   list.innerHTML = '';
-  if (cands.length === 0) {
+  if (allCandidates.length === 0) {
+    $('candCount').textContent = '0';
     list.innerHTML = '<p class="muted">No resumes screened yet. Upload one above.</p>';
     return;
   }
-  cands.forEach((c) => list.appendChild(renderCandidate(c)));
+  const shown = filteredCandidates();
+  $('candCount').textContent = shown.length === allCandidates.length
+    ? String(allCandidates.length)
+    : `${shown.length} / ${allCandidates.length}`;
+  if (shown.length === 0) {
+    list.innerHTML = '<p class="muted">No candidates match these filters.</p>';
+    return;
+  }
+  shown.forEach((c) => list.appendChild(renderCandidate(c)));
 }
 
 function scoreColor(score) {
@@ -237,6 +315,16 @@ $('fileInput').onchange = (e) => {
   if (file) uploadResume(file);
   e.target.value = '';
 };
+
+// Job search (sidebar)
+$('jobSearch').oninput = renderJobs;
+
+// Candidate filters
+$('candSearch').oninput = renderCandidates;
+$('filterVerdict').onchange = renderCandidates;
+$('filterDate').onchange = renderCandidates;
+$('filterSort').onchange = renderCandidates;
+$('clearFilters').onclick = () => { resetFilters(); renderCandidates(); };
 
 // ── Auth UI ──
 function showLogin(msg) {
