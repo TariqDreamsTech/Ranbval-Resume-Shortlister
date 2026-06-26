@@ -46,6 +46,9 @@ body {
 
 /* Layout */
 .layout { display: grid; grid-template-columns: 260px 1fr 290px; min-height: calc(100vh - 60px); }
+/* Before a job is opened: hide the Top 5 panel and collapse to 2 columns. */
+.layout.no-top5 { grid-template-columns: 260px 1fr; }
+.layout.no-top5 .top5-panel { display: none; }
 .sidebar { border-right: 1px solid var(--border); padding: 18px 14px; }
 .sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sidebar-head h2 { font-size: 0.95rem; margin: 0; }

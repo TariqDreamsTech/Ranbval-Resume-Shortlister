@@ -216,6 +216,10 @@ function renderCandidates() {
 function renderTop5() {
   const box = $('top5List');
   if (!box) return;
+  // Hide the whole panel (and collapse the grid) until a job is actually open.
+  const main = $('recruiterMain');
+  if (main) main.classList.toggle('no-top5', !activeJobId);
+  if (!activeJobId) return;
   const done = allCandidates.filter((c) => c.status === 'done');
   const top = done
     .slice()
@@ -710,6 +714,7 @@ function logout() {
   $('jobView').classList.add('hidden');
   $('jobForm').classList.add('hidden');
   $('emptyState').classList.remove('hidden');
+  $('recruiterMain').classList.add('no-top5');  // hide Top 5 until a job is opened
   showLogin();
 }
 
