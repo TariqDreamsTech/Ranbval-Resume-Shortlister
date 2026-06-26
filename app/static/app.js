@@ -993,7 +993,11 @@ $('stDownloadResume').onclick = () => {
 // ── Boot ──
 async function startApp() {
   await loadHealth();
-  await loadJobs();
+  // Jobs are recruiter-only (/api/jobs needs a recruiter). Students use the
+  // separate student workspace and must NOT call it (it would 403).
+  if (auth.accountType === 'recruiter') {
+    await loadJobs();
+  }
 }
 
 (async function init() {
