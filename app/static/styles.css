@@ -317,6 +317,22 @@ input:-webkit-autofill:focus {
 .pill { background: var(--panel-2); border: 1px solid var(--border); border-radius: 20px; padding: 1px 9px; font-size: 0.74rem; color: var(--muted); }
 
 .candidate-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* Pagination */
+.pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 14px; margin-top: 18px;
+}
+.pagination:empty { display: none; }
+.pg-btn {
+  background: var(--panel-2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 9px; padding: 7px 14px;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: border-color .15s, background .15s;
+}
+.pg-btn:hover:not(:disabled) { border-color: rgba(124,111,245,.5); background: rgba(124,111,245,.1); }
+.pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pg-info { font-size: 0.78rem; color: var(--muted); }
 .cand {
   border: 1px solid var(--border);
   border-radius: 14px;

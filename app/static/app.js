@@ -163,6 +163,7 @@ function resetFilters() {
   $('filterVerdict').value = '';
   $('filterDate').value = '';
   $('filterSort').value = 'newest';  // last uploaded shows first by default
+  candPage = 1;
 }
 
 // ── Candidates ──
@@ -216,10 +217,14 @@ function filteredCandidates() {
   return list;
 }
 
+const PAGE_SIZE = 10;
+let candPage = 1;
+
 function renderCandidates() {
   renderTop5();  // always keep the Top 5 panel in sync with the latest data
   const list = $('candidateList');
   list.innerHTML = '';
+  $('pagination').innerHTML = '';
   if (allCandidates.length === 0) {
     $('candCount').textContent = '0';
     list.innerHTML = '<p class="muted">No resumes screened yet. Upload one above.</p>';
@@ -233,7 +238,31 @@ function renderCandidates() {
     list.innerHTML = '<p class="muted">No candidates match these filters.</p>';
     return;
   }
-  shown.forEach((c) => list.appendChild(renderCandidate(c)));
+
+  // ── paginate ──
+  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  if (candPage > totalPages) candPage = totalPages;
+  const start = (candPage - 1) * PAGE_SIZE;
+  shown.slice(start, start + PAGE_SIZE).forEach((c) => list.appendChild(renderCandidate(c)));
+  renderPagination(totalPages, shown.length, start);
+}
+
+function renderPagination(totalPages, totalItems, start) {
+  const box = $('pagination');
+  if (totalPages <= 1) { box.innerHTML = ''; return; }
+  const from = start + 1;
+  const to = Math.min(start + PAGE_SIZE, totalItems);
+  box.innerHTML = `
+    <button class="pg-btn" data-pg="prev" ${candPage === 1 ? 'disabled' : ''}>‹ Prev</button>
+    <span class="pg-info">${from}–${to} of ${totalItems} · page ${candPage}/${totalPages}</span>
+    <button class="pg-btn" data-pg="next" ${candPage === totalPages ? 'disabled' : ''}>Next ›</button>`;
+  const go = (delta) => {
+    candPage = Math.min(totalPages, Math.max(1, candPage + delta));
+    renderCandidates();
+    $('candidateList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  box.querySelector('[data-pg="prev"]').onclick = () => go(-1);
+  box.querySelector('[data-pg="next"]').onclick = () => go(1);
 }
 
 // Top 5 scored candidates of the CURRENTLY OPEN job (best first).
@@ -662,10 +691,11 @@ $('resumeBtn').onclick = () => { if (!busy) runProcessing(); };
 $('jobSearch').oninput = renderJobs;
 
 // Candidate filters
-$('candSearch').oninput = renderCandidates;
-$('filterVerdict').onchange = renderCandidates;
-$('filterDate').onchange = renderCandidates;
-$('filterSort').onchange = renderCandidates;
+const onFilterChange = () => { candPage = 1; renderCandidates(); };
+$('candSearch').oninput = onFilterChange;
+$('filterVerdict').onchange = onFilterChange;
+$('filterDate').onchange = onFilterChange;
+$('filterSort').onchange = onFilterChange;
 $('clearFilters').onclick = () => { resetFilters(); renderCandidates(); };
 
 // ── Auth UI ──
