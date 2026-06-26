@@ -4,39 +4,45 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ranbval Resume Shortlister</title>
-  <link rel="stylesheet" href="/static/styles.css?v=7" />
+  <link rel="stylesheet" href="/static/styles.css?v=8" />
 </head>
 <body>
   <!-- Login overlay (shown until authenticated) -->
   <div id="loginOverlay" class="login-overlay">
-    <div class="login-stack">
-      <!-- Founder card -->
-      <div class="founder-card">
-        <img class="founder-pic" src="/static/ahsan-tariq.png?v=7" alt="Ahsan Tariq"
-             onerror="this.src='https://ui-avatars.com/api/?name=Ahsan+Tariq&background=7c6ff5&color=fff&size=160'" />
-        <div class="founder-name">Ahsan Tariq</div>
-        <div class="founder-title">Founder &amp; CEO · Ranbval Community</div>
+    <div class="login-split">
+      <!-- LEFT: brand / founder / ecosystem -->
+      <div class="brandside">
+        <div class="brandside-top">
+          <div class="founder">
+            <img class="founder-pic" src="/static/ahsan-tariq.png?v=8" alt="Ahsan Tariq"
+                 onerror="this.src='https://ui-avatars.com/api/?name=Ahsan+Tariq&background=7c6ff5&color=fff&size=160'" />
+            <div class="founder-name">Ahsan Tariq</div>
+            <div class="founder-title">Founder &amp; CEO · Ranbval Community</div>
+          </div>
+          <p class="brandside-tag">A family of AI products, built by one team — shipping fast.</p>
+        </div>
+        <div class="products">
+          <div class="products-head">The Ranbval ecosystem</div>
+          <div id="productsGrid" class="products-grid"></div>
+        </div>
       </div>
 
-      <form id="loginForm" class="login-card">
-        <div class="brand login-brand"><span class="brand-mark">⛨</span> Ranbval Resume Shortlister</div>
-        <p class="muted">Sign in to continue.</p>
-        <div class="seg" id="loginMode">
-          <button type="button" class="seg-btn active" data-mode="recruiter">I'm a Recruiter</button>
-          <button type="button" class="seg-btn" data-mode="student">I'm a Student</button>
-        </div>
-        <label>Username</label>
-        <input id="loginName" type="text" autocomplete="username" autofocus />
-        <label>Password</label>
-        <input id="loginPass" type="password" autocomplete="current-password" />
-        <div id="loginError" class="login-error hidden"></div>
-        <button id="loginBtn" class="btn btn-primary" type="submit" style="width:100%;margin-top:14px;">Sign in</button>
-      </form>
-
-      <!-- More from Ranbval -->
-      <div class="products">
-        <div class="products-head">More from Ranbval</div>
-        <div id="productsGrid" class="products-grid"></div>
+      <!-- RIGHT: login -->
+      <div class="formside">
+        <form id="loginForm" class="login-card">
+          <div class="brand login-brand"><span class="brand-mark">⛨</span> Resume Shortlister</div>
+          <p class="muted">Sign in to continue.</p>
+          <div class="seg" id="loginMode">
+            <button type="button" class="seg-btn active" data-mode="recruiter">I'm a Recruiter</button>
+            <button type="button" class="seg-btn" data-mode="student">I'm a Student</button>
+          </div>
+          <label>Username</label>
+          <input id="loginName" type="text" autocomplete="username" autofocus />
+          <label>Password</label>
+          <input id="loginPass" type="password" autocomplete="current-password" />
+          <div id="loginError" class="login-error hidden"></div>
+          <button id="loginBtn" class="btn btn-primary" type="submit" style="width:100%;margin-top:14px;">Sign in</button>
+        </form>
       </div>
     </div>
   </div>
@@ -295,6 +301,6 @@
     </div>
   </main>
 
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=8"></script>
 </body>
 </html>
