@@ -4,6 +4,30 @@ const $ = (id) => document.getElementById(id);
 let activeJobId = null;
 let threshold = 75;
 
+// ── Ranbval ecosystem shown on the login page (matches ranbval.com) ──
+const RANBVAL_PRODUCTS = [
+  { name: 'Ranbval', desc: 'Encrypted API key vault', url: 'https://www.ranbval.com/', icon: '🔐' },
+  { name: 'Ranbval Social', desc: 'The Living Network — AI social super-app', url: 'https://socialapp.ranbval.com/', icon: '🌐' },
+  { name: 'Ranbval Discovery', desc: 'The Content Intelligence OS', url: 'https://discovery.ranbval.com/', icon: '🧭' },
+  { name: 'Ranbval Conversations', desc: 'Every client message, one inbox', url: 'https://conversations.ranbval.com/', icon: '💬' },
+  { name: 'Ranbval Resume', desc: 'AI resume shortlister for recruiters', url: 'https://resume.ranbval.com/', icon: '📄' },
+  { name: '24n8n', desc: 'Automation & workflows, always on', url: 'https://24n8n.ranbval.com/', icon: '⚙️' },
+  { name: 'Volvexer', desc: 'volvexer.site', url: 'https://volvexer.site/', icon: '🚀' },
+];
+
+function renderProducts() {
+  const box = document.getElementById('productsGrid');
+  if (!box) return;
+  box.innerHTML = RANBVAL_PRODUCTS.map((p) => `
+    <a class="product" href="${p.url}" target="_blank" rel="noopener noreferrer">
+      <span class="product-icon">${p.icon}</span>
+      <span class="product-txt">
+        <span class="product-name">${p.name}</span>
+        <span class="product-desc">${p.desc}</span>
+      </span>
+    </a>`).join('');
+}
+
 // ── Auth state (token kept in localStorage) ──
 const auth = {
   get token() { return localStorage.getItem('rs_token') || ''; },
@@ -1006,6 +1030,7 @@ async function startApp() {
 }
 
 (async function init() {
+  renderProducts();  // login-page product showcase
   if (auth.token) {
     hideLogin();
     try { await startApp(); }
