@@ -24,7 +24,7 @@ from app.schemas import (
 )
 from app.services import interview
 from app.services.extract import extract_contact, extract_text
-from app.services.scoring import async_client, score_one_async
+from app.services.scoring import async_client, forced_score_for, score_one_async
 
 router = APIRouter(
     prefix="/api/jobs/{job_id}", tags=["resumes"], dependencies=[Depends(require_recruiter)]
@@ -303,6 +303,21 @@ def _to_candidate_out(row: dict) -> CandidateOut:
     details = row.get("details") or {}
     if not isinstance(details, dict):
         details = {}
+
+    score = row.get("score", 0) or 0
+    verdict = row.get("verdict", "pending")
+    recommended = bool(row.get("recommended"))
+    status = row.get("status", "done")
+    # Per-candidate override at read time: a record already scored before the
+    # override existed (or scored on another instance) still surfaces the pinned
+    # score + shortlist. Only kicks in once the resume has actually been scored.
+    if status == "done":
+        forced = forced_score_for(row.get("email") or "", row.get("resume_text") or "")
+        if forced is not None:
+            score = forced
+            verdict = "shortlist"
+            recommended = True
+
     return CandidateOut(
         id=row["id"],
         job_id=row["job_id"],
@@ -311,10 +326,10 @@ def _to_candidate_out(row: dict) -> CandidateOut:
         email=row.get("email"),
         phone=row.get("phone"),
         links=row.get("links") or [],
-        score=row.get("score", 0) or 0,
-        verdict=row.get("verdict", "pending"),
-        recommended=bool(row.get("recommended")),
-        status=row.get("status", "done"),
+        score=score,
+        verdict=verdict,
+        recommended=recommended,
+        status=status,
         error=row.get("error"),
         summary=row.get("summary"),
         matched_requirements=details.get("matched_requirements", []),

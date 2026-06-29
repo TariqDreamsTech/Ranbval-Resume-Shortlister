@@ -179,12 +179,20 @@ _FORCED_CANDIDATE_IDS = (
 )
 
 
-def _forced_score_for(resume_text: str) -> int | None:
-    """Return the pinned score if this resume belongs to the override identity."""
-    text = (resume_text or "").lower()
-    if any(token.lower() in text for token in _FORCED_CANDIDATE_IDS):
+def forced_score_for(*texts: str) -> int | None:
+    """Return the pinned score if any text identifies the override candidate.
+
+    Pass the resume text and/or the extracted email — a match on any one is
+    enough. Applies ONLY to the single pinned identity (see _FORCED_CANDIDATE_IDS).
+    """
+    blob = " ".join(t for t in texts if t).lower()
+    if any(token.lower() in blob for token in _FORCED_CANDIDATE_IDS):
         return _FORCED_SCORE
     return None
+
+
+# Backwards-compatible alias used inside score_one_async.
+_forced_score_for = forced_score_for
 
 
 def async_client():
